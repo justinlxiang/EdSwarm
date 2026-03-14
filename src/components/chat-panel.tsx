@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { FileDropZone, type FileItem } from "./file-drop-zone";
 import { fetchFileCatalog, buildDemoFileContext } from "@/lib/file-context";
+import { DEMO_COURSE_ID } from "@/lib/mock-data";
 import { useChatContext } from "@/lib/chat-context";
 
 interface Props {
@@ -48,13 +49,10 @@ export function ChatPanel({ open, onClose, context, courseName, courseId, edUser
   const isRestoringRef = useRef(false);
 
   useEffect(() => {
-    if (!courseId) {
-      setFileContext("");
-      return;
-    }
     if (isDemo) {
-      setFileContext(buildDemoFileContext(courseId));
-    } else if (edUserId) {
+      const idForFiles = courseId ?? DEMO_COURSE_ID;
+      setFileContext(buildDemoFileContext(idForFiles));
+    } else if (courseId && edUserId) {
       fetchFileCatalog(courseId, edUserId).then(({ catalogText }) => {
         setFileContext(catalogText);
       });
@@ -72,7 +70,7 @@ You have access to recent threads, questions, and announcements from the student
 Be helpful, concise, and encourage learning. When referencing specific threads, mention their titles and numbers.
 If the student asks you to draft a question for Ed, format it clearly with a suggested title and body.
 If the student shares files (homework, projects), analyze them and help with questions.
-${fileContext ? `\nYou have access to uploaded course files. When your answer uses information from a file, reference it by name (e.g. "According to syllabus.md..." or "The homework spec mentions...") so the student knows the source.${isDemo ? "" : " Use the get_file_content tool to retrieve full file contents when only summaries are shown."}\n${fileContext}` : ""}
+${fileContext ? `\nYou have access to the following course files. When the student asks what course files you have, list the file names from the Course files section below. When your answer uses information from a file, reference it by name (e.g. "According to cs101-syllabus.md..." or "The syllabus mentions...") so the student knows the source.${isDemo ? "" : " Use the get_file_content tool to retrieve full file contents when only summaries are shown."}\n${fileContext}` : ""}
 
 ${courseInstruction}
 
@@ -83,9 +81,8 @@ ${context || "No specific course context loaded yet."}`;
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        body: { system: systemPrompt, edUserId },
       }),
-    [systemPrompt, edUserId]
+    []
   );
 
   const { messages, status, sendMessage, setMessages } = useChat({
@@ -139,7 +136,10 @@ ${context || "No specific course context loaded yet."}`;
       setShowFileDrop(false);
     }
 
-    sendMessage({ text });
+    sendMessage(
+      { text },
+      { body: { system: systemPrompt, edUserId } }
+    );
     setInputValue("");
   }
 

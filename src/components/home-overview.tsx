@@ -52,8 +52,8 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
       const threadData = digest.threads
         .slice(0, 20)
         .map(
-          (t) =>
-            `- [${t.type}] id=${t.id} number=${t.number} "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_pinned ? " [PINNED]" : ""}${t.is_answered ? " [ANSWERED]" : ""}: ${stripXml(t.document || t.content).slice(0, 150)}`
+          (t, i) =>
+            `- [${t.type}] id=${t.id} number=${i + 1} "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_pinned ? " [PINNED]" : ""}${t.is_answered ? " [ANSWERED]" : ""}: ${stripXml(t.document || t.content).slice(0, 150)}`
         )
         .join("\n");
 

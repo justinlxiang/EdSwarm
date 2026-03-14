@@ -32,6 +32,7 @@ interface Props {
   colorIndex: number;
   onAskAbout: (courseCode: string, courseId: number) => void;
   onGenerateSummary: (digest: CourseDigestType) => Promise<string>;
+  onPostSuccess?: () => void;
 }
 
 export function CourseDigestCard({
@@ -40,6 +41,7 @@ export function CourseDigestCard({
   colorIndex,
   onAskAbout,
   onGenerateSummary,
+  onPostSuccess,
 }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [summary, setSummary] = useState(digest.summary || "");
@@ -150,8 +152,13 @@ export function CourseDigestCard({
           )}
 
           <div className="space-y-2.5">
-            {displayThreads.map((thread) => (
-              <ThreadCard key={thread.id} thread={thread} token={token} />
+            {displayThreads.map((thread, index) => (
+              <ThreadCard
+                key={thread.id}
+                thread={thread}
+                token={token}
+                displayNumber={index + 1}
+              />
             ))}
           </div>
 
@@ -179,6 +186,7 @@ export function CourseDigestCard({
           onClose={() => setComposerOpen(false)}
           course={digest.course}
           token={token}
+          onPostSuccess={onPostSuccess}
         />
       </div>
     </div>

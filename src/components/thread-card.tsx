@@ -118,9 +118,11 @@ interface ThreadCardProps {
   token: string;
   expandThreadId?: number | null;
   threadRef?: (el: HTMLDivElement | null) => void;
+  /** Display number (1 = most recent). When provided, used instead of thread.number. */
+  displayNumber?: number;
 }
 
-export function ThreadCard({ thread, token, expandThreadId, threadRef }: ThreadCardProps) {
+export function ThreadCard({ thread, token, expandThreadId, threadRef, displayNumber }: ThreadCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<EdThreadDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -348,7 +350,7 @@ export function ThreadCard({ thread, token, expandThreadId, threadRef }: ThreadC
               )}
             </div>
             <h4 className="font-semibold text-sm text-foreground leading-snug">
-              #{thread.number} {thread.title}
+              #{displayNumber ?? thread.number} {thread.title}
             </h4>
           </div>
           <div className="flex items-center gap-2 shrink-0">

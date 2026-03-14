@@ -5,6 +5,9 @@ export interface FileSummary {
   file_summary: string | null;
 }
 
+import { DEMO_COURSE_ID } from "./mock-data";
+import { DEMO_SYLLABUS_CONTENT } from "./demo-syllabus";
+
 const LOCAL_KEY_PREFIX = "edswarm_materials_";
 
 interface LocalFile {
@@ -26,17 +29,31 @@ function loadLocalFiles(courseId: number): LocalFile[] {
 }
 
 /**
+ * Returns demo course file chunks (name + content) for agent context.
+ * Uses localStorage when available; falls back to seed syllabus for DEMO_COURSE_ID.
+ */
+export function getDemoFileChunks(courseId: number): { name: string; content: string }[] {
+  const files = loadLocalFiles(courseId);
+  if (files.length > 0) {
+    return files.map((f) => ({ name: f.file_name, content: f.file_content }));
+  }
+  if (courseId === DEMO_COURSE_ID) {
+    return [{ name: "cs101-syllabus.md", content: DEMO_SYLLABUS_CONTENT }];
+  }
+  return [];
+}
+
+/**
  * Builds file context from demo localStorage files.
+ * For DEMO_COURSE_ID, falls back to seed syllabus when localStorage is empty.
  * Always inlines full content since local files are small.
  */
 export function buildDemoFileContext(courseId: number): string {
-  const files = loadLocalFiles(courseId);
-  if (files.length === 0) return "";
+  const chunks = getDemoFileChunks(courseId);
+  if (chunks.length === 0) return "";
   return (
     "\nCourse files:\n" +
-    files
-      .map((f) => `--- ${f.file_name} ---\n${f.file_content}`)
-      .join("\n\n")
+    chunks.map((c) => `--- ${c.name} ---\n${c.content}`).join("\n\n")
   );
 }
 

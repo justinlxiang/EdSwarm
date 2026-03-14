@@ -115,36 +115,45 @@ export function DigestView() {
 
   function handleAskAbout(courseCode: string, courseIdArg: number) {
     const courseDigest = digests.find((d) => d.course.code === courseCode);
-    if (!courseDigest) return;
+    const course = courseDigest?.course ?? courses.find((cr) => cr.course.id === courseIdArg)?.course;
+    if (!course) return;
 
-    setChatCourseName(`${courseCode} — ${courseDigest.course.name}`);
+    setChatCourseName(`${course.code} — ${course.name}`);
     setChatCourseId(courseIdArg);
     setChatOpen(true);
 
-    const recentFallback = courseDigest.threads
-      .slice(0, 30)
-      .map((t) => {
-        const body = stripXml(t.document || t.content).slice(0, 300);
-        let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
-        if (t.answers && t.answers.length > 0) {
-          const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
-          line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+    if (courseDigest && courseDigest.threads.length > 0) {
+      const recentFallback = courseDigest.threads
+        .slice(0, 30)
+        .map((t, i) => {
+          const body = stripXml(t.document || t.content).slice(0, 300);
+          let line = `[#${i + 1}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+          if (t.answers && t.answers.length > 0) {
+            const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
+            line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+          }
+          return line;
+        })
+        .join("\n");
+      setChatContext(
+        `Course: ${course.code} - ${course.name}\n\nRecent threads:\n${recentFallback}`
+      );
+      const fallbackLength = recentFallback.length;
+      fetchFullContext([course.id]).then((full) => {
+        if (full && full.length > fallbackLength) {
+          setChatContext(
+            `Course: ${course.code} - ${course.name}\n\nAll threads:\n${full}`
+          );
         }
-        return line;
-      })
-      .join("\n");
-    setChatContext(
-      `Course: ${courseCode} - ${courseDigest.course.name}\n\nRecent threads:\n${recentFallback}`
-    );
-
-    const fallbackLength = recentFallback.length;
-    fetchFullContext([courseDigest.course.id]).then((full) => {
-      if (full && full.length > fallbackLength) {
-        setChatContext(
-          `Course: ${courseCode} - ${courseDigest.course.name}\n\nAll threads:\n${full}`
-        );
-      }
-    });
+      });
+    } else {
+      setChatContext(
+        `Course: ${course.code} - ${course.name}\n\nNo recent threads in selected time range.`
+      );
+      fetchFullContext([course.id]).then((full) => {
+        if (full) setChatContext(`Course: ${course.code} - ${course.name}\n\nAll threads:\n${full}`);
+      });
+    }
   }
 
   const syncedCourses = useRef(new Set<number>());
@@ -177,9 +186,9 @@ export function DigestView() {
         .map((d) => {
           const threadList = d.threads
             .slice(0, 20)
-            .map((t) => {
+            .map((t, i) => {
               const body = stripXml(t.document || t.content).slice(0, 300);
-              let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+              let line = `[#${i + 1}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
               if (t.answers && t.answers.length > 0) {
                 const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
                 line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
@@ -199,14 +208,17 @@ export function DigestView() {
       });
     } else {
       const digest = digests.find((d) => d.course.id === selectedCourseId);
+      const course = digest?.course ?? courses.find((cr) => cr.course.id === selectedCourseId)?.course;
+      if (course) {
+        setChatCourseId(course.id);
+        setChatCourseName(`${course.code} — ${course.name}`);
+      }
       if (digest) {
-        setChatCourseId(digest.course.id);
-        setChatCourseName(`${digest.course.code} — ${digest.course.name}`);
         const recentFallback = digest.threads
           .slice(0, 30)
-          .map((t) => {
+          .map((t, i) => {
             const body = stripXml(t.document || t.content).slice(0, 300);
-            let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+            let line = `[#${i + 1}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
             if (t.answers && t.answers.length > 0) {
               const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
               line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
@@ -224,6 +236,13 @@ export function DigestView() {
             );
           }
         });
+      } else if (course) {
+        setChatContext(
+          `Course: ${course.code} - ${course.name}\n\nNo recent threads in selected time range.`
+        );
+        fetchFullContext([course.id]).then((full) => {
+          if (full) setChatContext(`Course: ${course.code} - ${course.name}\n\nAll threads:\n${full}`);
+        });
       }
     }
   }, [chatOpen, selectedCourseId, digests, courses]);
@@ -233,8 +252,8 @@ export function DigestView() {
       const threadData = digest.threads
         .slice(0, 30)
         .map(
-          (t) =>
-            `- [${t.type}] id=${t.id} number=${t.number} "${t.title}" (${t.category}, ${t.reply_count} replies, ${t.vote_count} votes)${t.is_answered ? " [ANSWERED]" : ""}${t.is_pinned ? " [PINNED]" : ""}: ${stripXml(t.document || t.content).slice(0, 200)}`
+          (t, i) =>
+            `- [${t.type}] id=${t.id} number=${i + 1} "${t.title}" (${t.category}, ${t.reply_count} replies, ${t.vote_count} votes)${t.is_answered ? " [ANSWERED]" : ""}${t.is_pinned ? " [PINNED]" : ""}: ${stripXml(t.document || t.content).slice(0, 200)}`
         )
         .join("\n");
 
@@ -449,8 +468,40 @@ export function DigestView() {
                   onClick={() => {
                     if (chatOpen) {
                       setChatOpen(false);
-                    } else if (selectedDigest) {
-                      handleAskAbout(selectedDigest.course.code, selectedDigest.course.id);
+                    } else if (selectedCourseId) {
+                      const course = selectedDigest?.course ?? courses.find((c) => c.course.id === selectedCourseId)?.course;
+                      if (course) {
+                        handleAskAbout(course.code, course.id);
+                      } else {
+                        setChatCourseName(undefined);
+                        setChatCourseId(undefined);
+                        setChatOpen(true);
+                        const richContext = digests
+                          .map((d) => {
+                            const threadList = d.threads
+                              .slice(0, 20)
+                              .map((t, i) => {
+                                const body = stripXml(t.document || t.content).slice(0, 300);
+                                let line = `[#${i + 1}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+                                if (t.answers && t.answers.length > 0) {
+                                  const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
+                                  line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+                                }
+                                return line;
+                              })
+                              .join("\n");
+                            return `${d.course.code} - ${d.course.name} (${d.threads.length} recent threads):\n${threadList}`;
+                          })
+                          .join("\n\n");
+                        setChatContext(richContext);
+                        const allCourseIds = courses
+                          .filter((cr) => cr.course.status === "active")
+                          .map((cr) => cr.course.id);
+                        fetchFullContext(allCourseIds).then((full) => {
+                          if (full && full.length > richContext.length) setChatContext(full);
+                        });
+                        setChatOpen(true);
+                      }
                     } else {
                       setChatCourseName(undefined);
                       setChatCourseId(undefined);
@@ -460,9 +511,9 @@ export function DigestView() {
                         .map((d) => {
                           const threadList = d.threads
                             .slice(0, 20)
-                            .map((t) => {
+                            .map((t, i) => {
                               const body = stripXml(t.document || t.content).slice(0, 300);
-                              let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+                              let line = `[#${i + 1}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
                               if (t.answers && t.answers.length > 0) {
                                 const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
                                 line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
@@ -730,6 +781,11 @@ export function DigestView() {
                   onThreadLinkClick={(courseId, threadId) => {
                     handleSelectCourse(courseId, threadId);
                   }}
+                  onPostSuccess={
+                    isDemo && token
+                      ? () => fetchDigests(token, courses, range)
+                      : undefined
+                  }
                 />
               )}
 

@@ -24,6 +24,7 @@ interface Props {
   onGenerateSummary: (digest: CourseDigestType) => Promise<string>;
   expandThreadId?: number | null;
   onThreadLinkClick?: (courseId: number, threadId: number) => void;
+  onPostSuccess?: () => void;
 }
 
 export function CourseDetailView({
@@ -34,6 +35,7 @@ export function CourseDetailView({
   onGenerateSummary,
   expandThreadId,
   onThreadLinkClick,
+  onPostSuccess,
 }: Props) {
   const [summary, setSummary] = useState(digest.summary || "");
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -169,13 +171,14 @@ export function CourseDetailView({
       )}
 
       <div className="space-y-2.5">
-        {digest.threads.map((thread) => (
+        {digest.threads.map((thread, index) => (
           <ThreadCard
             key={thread.id}
             thread={thread}
             token={token}
             expandThreadId={expandThreadId}
             threadRef={setThreadRef(thread.id)}
+            displayNumber={index + 1}
           />
         ))}
       </div>
@@ -191,6 +194,7 @@ export function CourseDetailView({
         onClose={() => setComposerOpen(false)}
         course={digest.course}
         token={token}
+        onPostSuccess={onPostSuccess}
       />
 
       <CourseMaterialsDialog

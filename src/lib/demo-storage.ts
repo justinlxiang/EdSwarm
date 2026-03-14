@@ -5,21 +5,29 @@ const THREADS_KEY = "edswarm_demo_threads";
 
 const SEED_IDS = new Set(SEED_THREADS.map((t) => t.id));
 
+function sortByNewestFirst(threads: EdThread[]): EdThread[] {
+  return [...threads].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 function loadThreads(): EdThread[] {
-  if (typeof window === "undefined") return [...SEED_THREADS];
+  if (typeof window === "undefined") return sortByNewestFirst(SEED_THREADS);
   try {
     const raw = localStorage.getItem(THREADS_KEY);
     if (!raw) {
-      localStorage.setItem(THREADS_KEY, JSON.stringify(SEED_THREADS));
-      return [...SEED_THREADS];
+      const sorted = sortByNewestFirst(SEED_THREADS);
+      localStorage.setItem(THREADS_KEY, JSON.stringify(sorted));
+      return sorted;
     }
     const stored: EdThread[] = JSON.parse(raw);
     const userThreads = stored.filter((t) => !SEED_IDS.has(t.id));
-    const merged = [...userThreads, ...SEED_THREADS];
+    const merged = sortByNewestFirst([...userThreads, ...SEED_THREADS]);
     localStorage.setItem(THREADS_KEY, JSON.stringify(merged));
     return merged;
   } catch {
-    return [...SEED_THREADS];
+    return sortByNewestFirst(SEED_THREADS);
   }
 }
 

@@ -12,7 +12,9 @@ function filterThreadsByTime(threads: EdThread[], range: TimeRange): EdThread[] 
       ? now.getTime() - 24 * 60 * 60 * 1000
       : now.getTime() - 7 * 24 * 60 * 60 * 1000
   );
-  return threads.filter((t) => new Date(t.created_at) >= cutoff);
+  return threads
+    .filter((t) => new Date(t.created_at) >= cutoff)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function useCourseDigests() {

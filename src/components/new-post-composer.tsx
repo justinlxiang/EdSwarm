@@ -30,11 +30,13 @@ interface Props {
   onClose: () => void;
   course: EdCourse;
   token: string;
+  /** Called after a post is successfully created (e.g. to refresh the digest). */
+  onPostSuccess?: () => void;
 }
 
 type PostType = "question" | "post";
 
-export function NewPostComposer({ open, onClose, course, token }: Props) {
+export function NewPostComposer({ open, onClose, course, token, onPostSuccess }: Props) {
   const { user, isDemo } = useToken();
   const [postType, setPostType] = useState<PostType>("question");
   const [title, setTitle] = useState("");
@@ -164,6 +166,7 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
           courseId: course.id,
         });
         setResult({ type: "success", message: "Posted successfully!" });
+        onPostSuccess?.();
         setTimeout(() => {
           setTitle("");
           setAiPrompt("");

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { EdCourse, EdCategory, AgentConfig, EdThread } from "@/lib/types";
 import { getAgentConfig, saveAgentConfig, clearAgentConfig } from "@/lib/agent-storage";
+import { getDemoFileChunks } from "@/lib/file-context";
 import { DEMO_TOKEN } from "@/lib/mock-data";
 import { getDemoThreads } from "@/lib/demo-storage";
 import { useToken } from "@/lib/context";
@@ -164,9 +165,17 @@ export function AgentConfigCard({ course, roleLabel, token, onStartAnswering }: 
         return true;
       });
 
-      // Merge cloud file contents into agent context
+      // Merge course file contents into agent context
       const mergedConfig = { ...config };
-      if (cloudFiles.length > 0 && user) {
+      if (isDemo) {
+        const demoChunks = getDemoFileChunks(course.id);
+        if (demoChunks.length > 0) {
+          mergedConfig.contextChunks = [
+            ...mergedConfig.contextChunks,
+            ...demoChunks,
+          ];
+        }
+      } else if (cloudFiles.length > 0 && user) {
         const cloudChunks = await Promise.all(
           cloudFiles.map(async (f) => {
             try {
@@ -197,7 +206,7 @@ export function AgentConfigCard({ course, roleLabel, token, onStartAnswering }: 
     } finally {
       setFetchingThreads(false);
     }
-  }, [token, course.id, config, onStartAnswering, cloudFiles, user]);
+  }, [token, course.id, config, onStartAnswering, cloudFiles, user, isDemo]);
 
   const hasConfig = config.instructions.trim().length > 0;
 
