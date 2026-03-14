@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import type { EdCourse } from "@/lib/types";
+import type { EdCourse, DuplicateMatch } from "@/lib/types";
+import { DEMO_TOKEN } from "@/lib/mock-data";
+import { addDemoThread } from "@/lib/demo-storage";
 import {
   X,
   Send,
@@ -13,6 +15,11 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
+  Search,
+  ExternalLink,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { RichEditor, htmlToEdXml } from "./rich-editor";
 
@@ -38,6 +45,9 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[] | null>(null);
+  const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -57,10 +67,10 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
   async function handleAiDraft() {
     if (!aiPrompt.trim() || aiLoading) return;
     setAiLoading(true);
+    setDuplicateMatches(null);
 
     const currentTitle = title.trim();
     const currentBody = editorRef.current?.textContent?.trim() || "";
-    const hasTitle = currentTitle.length > 0;
 
     const contextParts: string[] = [];
     if (currentTitle) contextParts.push(`Current title: "${currentTitle}"`);
@@ -69,31 +79,49 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
       ? `\n\nThe student has already written the following (take it into account and build on it):\n${contextParts.join("\n")}`
       : "";
 
-    const titleInstruction = hasTitle
-      ? 'The student already has a title, so set "title" to null.'
-      : 'The student has no title yet, so generate a concise, descriptive "title".';
+    const draftPromise = fetch("/api/summarize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system: `You are helping a student draft a ${postType} for Ed Discussion in the course "${course.code} - ${course.name}". Output a JSON object with "title" and "body" keys. Generate a concise, descriptive "title". The "body" should be clear, well-structured HTML suitable for a rich text editor (use <p>, <strong>, <em>, <ul>/<li>, <h2>, <code> tags as appropriate). Output ONLY valid JSON, nothing else.`,
+        prompt: `Draft a ${postType} about: ${aiPrompt}${contextStr}`,
+      }),
+    });
+
+    const dupPromise = fetch("/api/agent/check-duplicate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        courseId: course.id,
+        questionTitle: currentTitle || aiPrompt,
+        questionContent: currentBody || aiPrompt,
+      }),
+    }).catch(() => null);
 
     try {
-      const res = await fetch("/api/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system: `You are helping a student draft a ${postType} for Ed Discussion in the course "${course.code} - ${course.name}". Output a JSON object with "title" and "body" keys. ${titleInstruction} The "body" should be clear, well-structured HTML suitable for a rich text editor (use <p>, <strong>, <em>, <ul>/<li>, <h2>, <code> tags as appropriate). Output ONLY valid JSON, nothing else.`,
-          prompt: `Draft a ${postType} about: ${aiPrompt}${contextStr}`,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [draftRes, dupRes] = await Promise.all([draftPromise, dupPromise]);
+
+      if (draftRes.ok) {
+        const data = await draftRes.json();
+        const raw = (data.summary as string).trim();
+        const cleaned = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/, "");
         try {
-          const parsed = JSON.parse(data.summary);
-          if (!hasTitle && parsed.title) setTitle(parsed.title);
+          const parsed = JSON.parse(cleaned);
+          if (parsed.title) setTitle(parsed.title);
           if (parsed.body && editorRef.current) {
             editorRef.current.innerHTML = parsed.body;
           }
         } catch {
           if (editorRef.current) {
-            editorRef.current.innerHTML = `<p>${data.summary}</p>`;
+            editorRef.current.innerHTML = `<p>${raw}</p>`;
           }
+        }
+      }
+
+      if (dupRes?.ok) {
+        const dupData = await dupRes.json();
+        if (dupData.hasDuplicates && dupData.matches?.length > 0) {
+          setDuplicateMatches(dupData.matches);
         }
       }
     } finally {
@@ -101,57 +129,117 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
     }
   }
 
-  async function handleSubmit() {
-    if (!title.trim() || isEditorEmpty() || posting) return;
+  async function doPost() {
     setPosting(true);
     setResult(null);
 
     const contentXml = htmlToEdXml(getEditorHtml());
 
     try {
-      const res = await fetch("/api/ed/post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
+      if (token === DEMO_TOKEN) {
+        addDemoThread({
+          type: postType,
+          title,
+          category,
+          content: contentXml,
+          is_private: isPrivate,
+          is_anonymous: isAnonymous,
           courseId: course.id,
-          params: {
-            type: postType,
-            title,
-            category,
-            subcategory: "",
-            subsubcategory: "",
-            content: contentXml,
-            is_pinned: false,
-            is_private: isPrivate,
-            is_anonymous: isAnonymous,
-            is_megathread: false,
-            anonymous_comments: false,
-          },
-        }),
-      });
-
-      if (res.ok) {
+        });
         setResult({ type: "success", message: "Posted successfully!" });
         setTimeout(() => {
           setTitle("");
           setAiPrompt("");
+          setDuplicateMatches(null);
           if (editorRef.current) editorRef.current.innerHTML = "";
           setResult(null);
           onClose();
         }, 1500);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setResult({
-          type: "error",
-          message: data.error || "Failed to post. Please try again.",
+        const res = await fetch("/api/ed/post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            courseId: course.id,
+            params: {
+              type: postType,
+              title,
+              category,
+              subcategory: "",
+              subsubcategory: "",
+              content: contentXml,
+              is_pinned: false,
+              is_private: isPrivate,
+              is_anonymous: isAnonymous,
+              is_megathread: false,
+              anonymous_comments: false,
+            },
+          }),
         });
+
+        if (res.ok) {
+          setResult({ type: "success", message: "Posted successfully!" });
+          setTimeout(() => {
+            setTitle("");
+            setAiPrompt("");
+            setDuplicateMatches(null);
+            if (editorRef.current) editorRef.current.innerHTML = "";
+            setResult(null);
+            onClose();
+          }, 1500);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setResult({
+            type: "error",
+            message: data.error || "Failed to post. Please try again.",
+          });
+        }
       }
     } catch {
       setResult({ type: "error", message: "Network error. Please try again." });
     } finally {
       setPosting(false);
     }
+  }
+
+  async function handleSubmit() {
+    if (!title.trim() || isEditorEmpty() || posting || checkingDuplicates) return;
+
+    if (duplicateMatches !== null) {
+      await doPost();
+      return;
+    }
+
+    setCheckingDuplicates(true);
+    setResult(null);
+
+    try {
+      const questionContent = editorRef.current?.textContent?.trim() || "";
+      const res = await fetch("/api/agent/check-duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: course.id,
+          questionTitle: title,
+          questionContent,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hasDuplicates && data.matches?.length > 0) {
+          setDuplicateMatches(data.matches);
+          setCheckingDuplicates(false);
+          return;
+        }
+      }
+    } catch {
+      // If duplicate check fails, proceed with posting anyway
+    }
+
+    setCheckingDuplicates(false);
+    await doPost();
   }
 
   if (!open) return null;
@@ -320,6 +408,110 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
             </label>
           </div>
 
+          {/* Duplicate matches panel */}
+          {duplicateMatches && duplicateMatches.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-200/60">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-sm font-semibold text-amber-800">
+                  Similar questions already asked
+                </span>
+                <span className="text-xs text-amber-600 ml-auto">
+                  {duplicateMatches.length} match{duplicateMatches.length !== 1 && "es"}
+                </span>
+              </div>
+              <div className="divide-y divide-amber-200/40">
+                {duplicateMatches.map((match) => {
+                  const isExpanded = expandedMatch === match.threadId;
+                  const badge =
+                    match.relevance === "exact_duplicate"
+                      ? { label: "Exact duplicate", cls: "bg-red-100 text-red-700" }
+                      : match.relevance === "likely_answered"
+                        ? { label: "Likely answered", cls: "bg-amber-100 text-amber-700" }
+                        : { label: "Related", cls: "bg-blue-100 text-blue-700" };
+                  return (
+                    <div key={match.threadId} className="px-4 py-3">
+                      <button
+                        onClick={() =>
+                          setExpandedMatch(isExpanded ? null : match.threadId)
+                        }
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}
+                              >
+                                {badge.label}
+                              </span>
+                              <span className="text-xs text-amber-600/80">
+                                #{match.threadNumber}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium text-amber-900 leading-snug">
+                              {match.title}
+                            </p>
+                            <p className="text-xs text-amber-700/70 mt-0.5">
+                              {match.explanation}
+                            </p>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          )}
+                        </div>
+                      </button>
+                      {isExpanded && match.answerSnippet && (
+                        <div className="mt-2 p-3 rounded-lg bg-white/80 border border-amber-200/40">
+                          <p className="text-xs font-medium text-amber-700 mb-1">
+                            Existing answer:
+                          </p>
+                          <p className="text-sm text-foreground/80 leading-relaxed">
+                            {match.answerSnippet}
+                          </p>
+                          <a
+                            href={`https://edstem.org/us/courses/${course.id}/discussion/${match.threadNumber}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            View on Ed
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 px-4 py-3 border-t border-amber-200/60 bg-amber-50">
+                <button
+                  onClick={() => {
+                    setDuplicateMatches(null);
+                    setExpandedMatch(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-amber-300 text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={posting}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                >
+                  {posting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {posting ? "Posting..." : "Post Anyway"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Result message */}
           {result && (
             <div
@@ -346,18 +538,30 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
             {isPrivate && " · Private"}
             {isAnonymous && " · Anonymous"}
           </p>
-          <button
-            onClick={handleSubmit}
-            disabled={posting || !title.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {posting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            {posting ? "Posting..." : "Post to Ed"}
-          </button>
+          {!duplicateMatches && (
+            <button
+              onClick={handleSubmit}
+              disabled={posting || checkingDuplicates || !title.trim()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {checkingDuplicates ? (
+                <>
+                  <Search className="w-4 h-4 animate-pulse" />
+                  Checking for similar questions...
+                </>
+              ) : posting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Post to Ed
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </>

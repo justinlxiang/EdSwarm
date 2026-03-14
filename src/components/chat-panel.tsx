@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { SimpleMarkdown } from "./simple-markdown";
 import type { UIMessage } from "ai";
 import {
   X,
@@ -67,7 +68,9 @@ ${context || "No specific course context loaded yet."}`;
   const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }, [messages]);
 
   function handleFormSubmit(e: React.FormEvent) {
@@ -177,7 +180,11 @@ ${context || "No specific course context loaded yet."}`;
                       : "bg-muted text-foreground"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{text}</p>
+                  {m.role === "user" ? (
+                    <p className="whitespace-pre-wrap">{text}</p>
+                  ) : (
+                    <SimpleMarkdown text={text} className="space-y-1.5" />
+                  )}
                 </div>
                 {m.role === "user" && (
                   <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">

@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { EdThread, EdComment, EdThreadDetail } from "@/lib/types";
+import { DEMO_TOKEN } from "@/lib/mock-data";
+import { getDemoThreadDetail, addDemoComment } from "@/lib/demo-storage";
 import {
   MessageSquare,
   Eye,
@@ -17,6 +19,7 @@ import {
   User,
   Reply,
   Award,
+  PenLine,
 } from "lucide-react";
 
 function stripXml(xml: string): string {
@@ -122,7 +125,9 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
   const [aiInput, setAiInput] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiMode, setAiMode] = useState<"ask" | "draft">("ask");
+  const [aiMode, setAiMode] = useState<"write" | "draft" | "ask">("write");
+  const [postingReply, setPostingReply] = useState(false);
+  const [replyResult, setReplyResult] = useState<"success" | "error" | null>(null);
   const aiResponseRef = useRef<HTMLDivElement>(null);
 
   const preview = stripXml(thread.document || thread.content);
@@ -131,14 +136,19 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
     if (detail || loadingDetail) return;
     setLoadingDetail(true);
     try {
-      const res = await fetch("/api/ed/thread", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, threadId: thread.id }),
-      });
-      if (res.ok) {
-        const data: EdThreadDetail = await res.json();
-        setDetail(data);
+      if (token === DEMO_TOKEN) {
+        const data = getDemoThreadDetail(thread.id);
+        if (data) setDetail(data);
+      } else {
+        const res = await fetch("/api/ed/thread", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, threadId: thread.id }),
+        });
+        if (res.ok) {
+          const data: EdThreadDetail = await res.json();
+          setDetail(data);
+        }
       }
     } finally {
       setLoadingDetail(false);
@@ -156,6 +166,44 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
       aiResponseRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [aiResponse]);
+
+  async function handleDirectPost(e: React.FormEvent) {
+    e.preventDefault();
+    if (!aiInput.trim() || postingReply) return;
+    setPostingReply(true);
+    setReplyResult(null);
+
+    try {
+      let ok = false;
+      if (token === DEMO_TOKEN) {
+        addDemoComment(thread.id, aiInput, "comment");
+        ok = true;
+      } else {
+        const res = await fetch("/api/ed/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            threadId: thread.id,
+            content: aiInput,
+            document: `<paragraph>${aiInput}</paragraph>`,
+          }),
+        });
+        ok = res.ok;
+      }
+      setReplyResult(ok ? "success" : "error");
+      if (ok) {
+        setTimeout(() => {
+          setAiInput("");
+          setReplyResult(null);
+        }, 2000);
+      }
+    } catch {
+      setReplyResult("error");
+    } finally {
+      setPostingReply(false);
+    }
+  }
 
   async function handleAiSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -211,6 +259,44 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
       setAiResponse("Failed to get AI response. Please try again.");
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function handlePostReply() {
+    if (!aiResponse || postingReply) return;
+    setPostingReply(true);
+    setReplyResult(null);
+
+    try {
+      let ok = false;
+      if (token === DEMO_TOKEN) {
+        addDemoComment(thread.id, aiResponse, "comment");
+        ok = true;
+      } else {
+        const res = await fetch("/api/ed/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            threadId: thread.id,
+            content: aiResponse,
+            document: `<paragraph>${aiResponse}</paragraph>`,
+          }),
+        });
+        ok = res.ok;
+      }
+      setReplyResult(ok ? "success" : "error");
+      if (ok) {
+        setTimeout(() => {
+          setAiResponse("");
+          setAiInput("");
+          setReplyResult(null);
+        }, 2000);
+      }
+    } catch {
+      setReplyResult("error");
+    } finally {
+      setPostingReply(false);
     }
   }
 
@@ -327,15 +413,15 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
           <div className="px-4 pb-4 border-t border-border/30 pt-3">
             <div className="flex items-center bg-muted rounded-lg p-0.5 mb-2 w-fit">
               <button
-                onClick={() => setAiMode("ask")}
+                onClick={() => setAiMode("write")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  aiMode === "ask"
+                  aiMode === "write"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Sparkles className="w-3 h-3" />
-                Ask AI
+                <PenLine className="w-3 h-3" />
+                Write Reply
               </button>
               <button
                 onClick={() => setAiMode("draft")}
@@ -346,30 +432,61 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
                 }`}
               >
                 <Reply className="w-3 h-3" />
-                Draft Reply
+                AI Draft
+              </button>
+              <button
+                onClick={() => setAiMode("ask")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  aiMode === "ask"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                Ask AI
               </button>
             </div>
 
-            <form onSubmit={handleAiSubmit} className="flex items-center gap-2">
+            {replyResult === "success" && aiMode === "write" && (
+              <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium mb-2">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Reply posted!
+              </div>
+            )}
+            {replyResult === "error" && aiMode === "write" && (
+              <div className="text-xs text-red-500 mb-2">
+                Failed to post reply. Please try again.
+              </div>
+            )}
+
+            <form
+              onSubmit={aiMode === "write" ? handleDirectPost : handleAiSubmit}
+              className="flex items-center gap-2"
+            >
               <input
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
                 placeholder={
-                  aiMode === "draft"
-                    ? "Describe what you want to reply..."
-                    : "Ask a question about this thread..."
+                  aiMode === "write"
+                    ? "Type your reply..."
+                    : aiMode === "draft"
+                      ? "Describe what you want to reply..."
+                      : "Ask a question about this thread..."
                 }
                 className="flex-1 px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-all"
-                disabled={aiLoading}
+                disabled={aiLoading || postingReply}
                 onClick={(e) => e.stopPropagation()}
               />
               <button
                 type="submit"
-                disabled={aiLoading || !aiInput.trim()}
-                className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                disabled={aiLoading || postingReply || !aiInput.trim()}
+                className={`p-2 rounded-lg text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 ${
+                  aiMode === "write" ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"
+                }`}
                 onClick={(e) => e.stopPropagation()}
+                title={aiMode === "write" ? "Post reply to Ed" : undefined}
               >
-                {aiLoading ? (
+                {aiLoading || postingReply ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
@@ -380,17 +497,63 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
             {aiResponse && (
               <div
                 ref={aiResponseRef}
-                className="mt-3 p-3 rounded-xl bg-accent/60 border border-primary/10"
+                className="mt-3 rounded-xl bg-accent/60 border border-primary/10 overflow-hidden"
               >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">
-                    {aiMode === "draft" ? "Draft Reply" : "AI Answer"}
-                  </span>
+                <div className="p-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Bot className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">
+                      {aiMode === "draft" ? "Draft Reply" : "AI Answer"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                    {aiResponse}
+                  </p>
                 </div>
-                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                  {aiResponse}
-                </p>
+
+                {aiMode === "draft" && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/5 border-t border-primary/10">
+                    {replyResult === "success" ? (
+                      <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Reply posted!
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostReply();
+                          }}
+                          disabled={postingReply}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                        >
+                          {postingReply ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          {postingReply ? "Posting..." : "Post Reply to Ed"}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAiResponse("");
+                            setReplyResult(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          Discard
+                        </button>
+                        {replyResult === "error" && (
+                          <span className="text-xs text-red-500 ml-auto">
+                            Failed to post
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

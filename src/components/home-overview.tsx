@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CourseDigest } from "@/lib/types";
 import { COURSE_COLORS } from "./course-digest";
+import { SimpleMarkdown } from "./simple-markdown";
 import {
   BookOpen,
   MessageSquare,
@@ -26,9 +27,11 @@ interface Props {
   digests: CourseDigest[];
   onSelectCourse: (courseId: number) => void;
   range: "day" | "week";
+  courseColorMap: Map<number, number>;
+  onSummaryGenerated?: (courseId: number, summary: string) => void;
 }
 
-export function HomeOverview({ digests, onSelectCourse, range }: Props) {
+export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, onSummaryGenerated }: Props) {
   const [summaries, setSummaries] = useState<Record<number, string>>({});
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
   const fetchedRef = useRef<Set<number>>(new Set());
@@ -69,6 +72,7 @@ export function HomeOverview({ digests, onSelectCourse, range }: Props) {
               ...prev,
               [digest.course.id]: data.summary,
             }));
+            onSummaryGenerated?.(digest.course.id, data.summary);
           }
         })
         .finally(() => {
@@ -167,8 +171,8 @@ export function HomeOverview({ digests, onSelectCourse, range }: Props) {
           </button>
           {!isCollapsed && <div className="grid gap-4 sm:grid-cols-2">
             {termDigests.map((digest) => {
-              const globalIdx = digests.indexOf(digest);
-              const colors = COURSE_COLORS[globalIdx % COURSE_COLORS.length];
+              const stableIdx = courseColorMap.get(digest.course.id) ?? 0;
+              const colors = COURSE_COLORS[stableIdx % COURSE_COLORS.length];
               const questions = digest.threads.filter(
                 (t) => t.type === "question"
               ).length;
@@ -251,9 +255,10 @@ export function HomeOverview({ digests, onSelectCourse, range }: Props) {
                               Key Updates
                             </span>
                           </div>
-                          <p className="whitespace-pre-wrap line-clamp-4">
-                            {summary}
-                          </p>
+                          <SimpleMarkdown
+                            text={summary}
+                            className="space-y-1"
+                          />
                         </div>
                       )}
                       {!isLoading && !summary && (

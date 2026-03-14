@@ -13,6 +13,7 @@ import {
   PenSquare,
 } from "lucide-react";
 import { NewPostComposer } from "./new-post-composer";
+import { SimpleMarkdown } from "./simple-markdown";
 
 export const COURSE_COLORS = [
   { bg: "bg-blue-500/10", text: "text-blue-600", border: "border-blue-200", btn: "bg-blue-600 hover:bg-blue-700", accent: "bg-blue-50", accentBorder: "border-blue-100", summaryText: "text-blue-600", stripe: "bg-blue-500" },
@@ -141,9 +142,10 @@ export function CourseDigestCard({
                   AI Summary
                 </span>
               </div>
-              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                {summary}
-              </p>
+              <SimpleMarkdown
+                text={summary}
+                className="text-sm text-foreground/80 leading-relaxed space-y-1.5"
+              />
             </div>
           )}
 

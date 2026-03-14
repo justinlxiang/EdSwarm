@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     `Summarize these recent Ed Discussion threads for course "${courseCode} - ${courseName}" into a concise digest (3-5 bullet points). Focus on key topics, important announcements, popular questions, and any unresolved issues.\n\nThreads:\n${threads}`;
 
   const { text } = await generateText({
-    model: anthropic("claude-3-5-haiku-latest"),
+    model: anthropic("claude-haiku-4-5"),
     system: resolvedSystem,
     prompt: resolvedPrompt,
   });

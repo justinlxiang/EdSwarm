@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useState } from "react";
+import { DEMO_TOKEN } from "@/lib/mock-data";
 import {
   Bold,
   Italic,
@@ -129,24 +130,37 @@ export function RichEditor({ token, editorRef, placeholder }: Props) {
     if (!file.type.startsWith("image/") && !file.type.startsWith("application/")) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("token", token);
-      formData.append("file", file);
-
-      const res = await fetch("/api/ed/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const fileId = data.file?.id;
-        if (fileId) {
-          const url = `https://static.us.edusercontent.com/files/${fileId}`;
+      if (token === DEMO_TOKEN) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const url = reader.result as string;
           if (file.type.startsWith("image/")) {
             exec("insertHTML", `<img src="${url}" style="max-width:100%;border-radius:8px;margin:8px 0" />`);
           } else {
-            exec("insertHTML", `<a href="${url}" target="_blank">${file.name}</a>`);
+            exec("insertHTML", `<a href="#">${file.name}</a>`);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const formData = new FormData();
+        formData.append("token", token);
+        formData.append("file", file);
+
+        const res = await fetch("/api/ed/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const fileId = data.file?.id;
+          if (fileId) {
+            const url = `https://static.us.edusercontent.com/files/${fileId}`;
+            if (file.type.startsWith("image/")) {
+              exec("insertHTML", `<img src="${url}" style="max-width:100%;border-radius:8px;margin:8px 0" />`);
+            } else {
+              exec("insertHTML", `<a href="${url}" target="_blank">${file.name}</a>`);
+            }
           }
         }
       }

@@ -4,14 +4,17 @@ import { useState } from "react";
 import type { CourseDigest as CourseDigestType } from "@/lib/types";
 import { ThreadCard } from "./thread-card";
 import { COURSE_COLORS } from "./course-digest";
+import { SimpleMarkdown } from "./simple-markdown";
 import {
   BookOpen,
   MessageCircle,
   Sparkles,
   Loader2,
   PenSquare,
+  FolderOpen,
 } from "lucide-react";
 import { NewPostComposer } from "./new-post-composer";
+import { CourseMaterialsDialog } from "./course-materials";
 
 interface Props {
   digest: CourseDigestType;
@@ -31,6 +34,7 @@ export function CourseDetailView({
   const [summary, setSummary] = useState(digest.summary || "");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [materialsOpen, setMaterialsOpen] = useState(false);
 
   const colors = COURSE_COLORS[colorIndex % COURSE_COLORS.length];
 
@@ -70,6 +74,13 @@ export function CourseDetailView({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setMaterialsOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border ${colors.border} ${colors.text} hover:opacity-80 transition-colors`}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            Materials
+          </button>
           <button
             onClick={() => setComposerOpen(true)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border ${colors.border} ${colors.text} hover:opacity-80 transition-colors`}
@@ -127,9 +138,10 @@ export function CourseDetailView({
               AI Summary
             </span>
           </div>
-          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-            {summary}
-          </p>
+          <SimpleMarkdown
+            text={summary}
+            className="text-sm text-foreground/80 leading-relaxed space-y-1.5"
+          />
         </div>
       )}
 
@@ -150,6 +162,12 @@ export function CourseDetailView({
         onClose={() => setComposerOpen(false)}
         course={digest.course}
         token={token}
+      />
+
+      <CourseMaterialsDialog
+        courseId={digest.course.id}
+        open={materialsOpen}
+        onClose={() => setMaterialsOpen(false)}
       />
     </div>
   );
