@@ -83,7 +83,7 @@ const FEATURES = [
     icon: PenTool,
     title: "Rich Post Composer",
     description:
-      "Write beautiful posts with a full WYSIWYG editor. Format with headings, lists, code blocks, images, and links. Let AI draft your post and refine it before publishing.",
+      "Write beautiful posts with a full markdown editor. Format with headings, lists, code blocks, images, and links. Let AI draft your post and refine it before publishing.",
     color: "from-emerald-500 to-teal-600",
     bg: "bg-emerald-50",
     text: "text-emerald-600",
