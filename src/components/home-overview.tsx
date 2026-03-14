@@ -62,7 +62,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system:
-            "You are a course digest summarizer. Highlight the most critical and actionable items: important announcements, deadline changes, unanswered questions needing attention, and key updates. Use 2-4 concise bullet points with plain text (use '- ' prefix). Keep it under 100 words. Prioritize what a student MUST know. When a bullet relates to a specific thread, add a link at the end: [View #N](thread:COURSE_ID:THREAD_ID) where N is the thread number and THREAD_ID is the thread id.",
+            "You are a course digest summarizer. Highlight the most critical and actionable items: important announcements, deadline changes, unanswered questions needing attention, and key updates. Use 2-4 concise bullet points with plain text (use '- ' prefix). Keep it under 100 words. Prioritize what a student MUST know. When a bullet relates to a specific thread, add a link at the end: [Thread #N](thread:COURSE_ID:THREAD_ID) where N is the thread number and THREAD_ID is the thread id.",
           prompt: `Summarize the most important recent activity for "${digest.course.code} - ${digest.course.name}" from the ${range === "day" ? "last 24 hours" : "last week"}:\n\n${threadData}`,
           threadsWithIds: threadData,
           courseId: digest.course.id,
