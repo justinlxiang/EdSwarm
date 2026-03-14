@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Sparkles,
   MessageSquareText,
-  BookOpen,
   GraduationCap,
   Users,
   Zap,
@@ -14,7 +13,6 @@ import {
   Bot,
   CheckCircle2,
   ArrowRight,
-  ChevronRight,
   Layers,
   Shield,
   Clock,
@@ -29,11 +27,10 @@ interface LandingPageProps {
   userName?: string;
 }
 
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLDivElement>(null);
+function useInView(threshold = 0.15): [(node: HTMLElement | null) => void, boolean] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => {
@@ -46,8 +43,9 @@ function useInView(threshold = 0.15) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, visible };
+  }, [el, threshold]);
+  const ref = useCallback((node: HTMLElement | null) => setEl(node), []);
+  return [ref, visible];
 }
 
 const FEATURES = [
@@ -65,7 +63,7 @@ const FEATURES = [
     icon: MessageSquareText,
     title: "Smart AI Chat",
     description:
-      "Ask anything about your courses. The AI reads all your threads and materials, giving you context-aware answers instantly. Like having a TA that knows everything.",
+      "Ask anything about your courses and get instant, context-aware answers — without posting a single thread. The AI reads all your threads and materials, so students find what they need without adding noise to the forum.",
     color: "from-violet-500 to-purple-600",
     bg: "bg-violet-50",
     text: "text-violet-600",
@@ -75,7 +73,7 @@ const FEATURES = [
     icon: Copy,
     title: "Duplicate Detection",
     description:
-      "Before posting a new question, AI scans all existing threads to find exact matches, likely answers, and related discussions. Never ask a question that's already been answered.",
+      "Keep your forum clean. Before any new question is posted, AI scans all existing threads to surface exact matches and likely answers. Students get help faster, and the discussion board stays free of redundant posts.",
     color: "from-amber-500 to-orange-600",
     bg: "bg-amber-50",
     text: "text-amber-600",
@@ -122,7 +120,7 @@ const CAPABILITIES = [
   {
     icon: Search,
     label: "Smart Search",
-    desc: "Find answers across all threads instantly",
+    desc: "Find answers across all threads — no need to re-ask",
   },
   {
     icon: FileText,
@@ -157,11 +155,11 @@ const CAPABILITIES = [
 ];
 
 export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
-  const hero = useInView(0.1);
-  const features = useInView(0.1);
-  const capabilities = useInView(0.1);
-  const roles = useInView(0.1);
-  const cta = useInView(0.1);
+  const [heroRef, heroVisible] = useInView(0.1);
+  const [featuresRef, featuresVisible] = useInView(0.1);
+  const [capabilitiesRef, capabilitiesVisible] = useInView(0.1);
+  const [rolesRef, rolesVisible] = useInView(0.1);
+  const [ctaRef, ctaVisible] = useInView(0.1);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -177,7 +175,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
     <div className="min-h-screen bg-white overflow-x-hidden">
       {/* Hero */}
       <section
-        ref={hero.ref}
+        ref={heroRef}
         className="relative min-h-[85vh] flex items-center justify-center overflow-hidden"
       >
         {/* Animated gradient background */}
@@ -213,7 +211,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
         />
 
         <div
-          className={`relative z-10 max-w-4xl mx-auto px-6 text-center transition-all duration-1000 ${hero.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          className={`relative z-10 max-w-4xl mx-auto px-6 text-center transition-all duration-1000 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur border border-border/60 shadow-sm mb-8">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -239,10 +237,10 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
                   stroke="url(#underline-gradient)"
                   strokeWidth="3"
                   strokeLinecap="round"
-                  className={`transition-all duration-1000 delay-500 ${hero.visible ? "opacity-100" : "opacity-0"}`}
+                  className={`transition-all duration-1000 delay-500 ${heroVisible ? "opacity-100" : "opacity-0"}`}
                   style={{
                     strokeDasharray: 300,
-                    strokeDashoffset: hero.visible ? 0 : 300,
+                    strokeDashoffset: heroVisible ? 0 : 300,
                     transition: "stroke-dashoffset 1.2s ease-out 0.5s, opacity 0.3s ease-out 0.5s",
                   }}
                 />
@@ -265,10 +263,14 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
             with AI
           </h1>
 
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-2 leading-relaxed">
             EdSwarm brings AI swarm intelligence to your Ed Discussion courses.
-            Instant digests, smart chat, duplicate detection, and automated
-            answers — all in one beautiful interface.
+          </p>
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+            <span className="font-semibold text-foreground">Get instant answers</span> with context-aware retrieval, <span className="font-semibold text-foreground">catch duplicates</span> before
+            they&apos;re posted, and let teachers{" "}
+            <span className="font-semibold text-foreground">answer at scale</span> — all in
+            one beautiful interface.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -293,7 +295,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
             ].map(({ icon: Icon, label }, i) => (
               <div
                 key={label}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur border border-border/50 shadow-sm text-sm text-muted-foreground transition-all duration-700 ${hero.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur border border-border/50 shadow-sm text-sm text-muted-foreground transition-all duration-700 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: `${800 + i * 100}ms` }}
               >
                 <Icon className="w-3.5 h-3.5 text-primary" />
@@ -305,10 +307,10 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
       </section>
 
       {/* Feature Grid */}
-      <section ref={features.ref} className="py-24 px-6 bg-white relative">
+      <section ref={featuresRef} className="py-24 px-6 bg-white relative">
         <div className="max-w-6xl mx-auto">
           <div
-            className={`text-center mb-16 transition-all duration-700 ${features.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+            className={`text-center mb-16 transition-all duration-700 ${featuresVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
           >
             <span className="inline-block text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
               Features
@@ -328,7 +330,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
               return (
                 <div
                   key={feature.title}
-                  className={`group relative p-6 rounded-2xl border ${feature.border} bg-white hover:shadow-lg transition-all duration-500 ${features.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  className={`group relative p-6 rounded-2xl border ${feature.border} bg-white hover:shadow-lg transition-all duration-500 ${featuresVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
                   style={{ transitionDelay: `${200 + i * 100}ms` }}
                 >
                   <div
@@ -354,12 +356,12 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
 
       {/* Capabilities strip */}
       <section
-        ref={capabilities.ref}
+        ref={capabilitiesRef}
         className="py-20 px-6 bg-gradient-to-b from-slate-50/80 to-white"
       >
         <div className="max-w-6xl mx-auto">
           <div
-            className={`text-center mb-14 transition-all duration-700 ${capabilities.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+            className={`text-center mb-14 transition-all duration-700 ${capabilitiesVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
           >
             <span className="inline-block text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
               Capabilities
@@ -375,7 +377,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
               return (
                 <div
                   key={cap.label}
-                  className={`group p-5 rounded-2xl bg-white border border-border/50 hover:border-primary/20 hover:shadow-md transition-all duration-500 ${capabilities.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+                  className={`group p-5 rounded-2xl bg-white border border-border/50 hover:border-primary/20 hover:shadow-md transition-all duration-500 ${capabilitiesVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
                   style={{ transitionDelay: `${150 + i * 80}ms` }}
                 >
                   <Icon className="w-5 h-5 text-primary mb-3 group-hover:scale-110 transition-transform duration-300" />
@@ -393,10 +395,10 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
       </section>
 
       {/* Student vs Teacher */}
-      <section ref={roles.ref} className="py-24 px-6 bg-white">
+      <section ref={rolesRef} className="py-24 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
           <div
-            className={`text-center mb-16 transition-all duration-700 ${roles.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+            className={`text-center mb-16 transition-all duration-700 ${rolesVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
           >
             <span className="inline-block text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
               Two Perspectives
@@ -407,7 +409,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
           </div>
 
           <div
-            className={`grid md:grid-cols-2 gap-8 transition-all duration-700 ${roles.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+            className={`grid md:grid-cols-2 gap-8 transition-all duration-700 ${rolesVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
             style={{ transitionDelay: "200ms" }}
           >
             {/* Student card */}
@@ -423,8 +425,8 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
                 <ul className="space-y-3">
                   {[
                     "AI-powered course activity digests",
-                    "Smart chat — ask anything about your courses",
-                    "Duplicate detection before posting",
+                    "Smart chat — get answers without posting to the forum",
+                    "Duplicate detection keeps the board clutter-free",
                     "AI-assisted post drafting & replies",
                     "Upload course materials for better AI context",
                     "Browse threads with time range filtering",
@@ -552,7 +554,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
 
       {/* Final CTA */}
       <section
-        ref={cta.ref}
+        ref={ctaRef}
         className="py-24 px-6 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 relative overflow-hidden"
       >
         <div
@@ -562,7 +564,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
           }}
         />
         <div
-          className={`relative max-w-2xl mx-auto text-center transition-all duration-700 ${cta.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+          className={`relative max-w-2xl mx-auto text-center transition-all duration-700 ${ctaVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
         >
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
             Ready to dive in?
