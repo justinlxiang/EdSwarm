@@ -364,8 +364,7 @@ export function DigestView() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      {/* Header - unchanged */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-border/40">
+      <header className="fixed top-0 left-0 right-0 z-30 bg-white/80 backdrop-blur-lg border-b border-border/40">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -557,6 +556,7 @@ export function DigestView() {
         </div>
       </header>
 
+      <div className="pt-[57px]">
       {showLanding ? (
         <LandingPage
           onEnterDashboard={() => {
@@ -827,6 +827,7 @@ export function DigestView() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
