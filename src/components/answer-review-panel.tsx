@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { EdThread, AgentConfig, AnswerReviewItem } from "@/lib/types";
 import { DEMO_TOKEN } from "@/lib/mock-data";
 import { addDemoComment } from "@/lib/demo-storage";
+import { SimpleMarkdown } from "./simple-markdown";
 import {
   X,
   Loader2,
@@ -15,6 +16,8 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  Eye,
+  Pencil,
 } from "lucide-react";
 
 function stripXml(xml: string): string {
@@ -43,6 +46,7 @@ export function AnswerReviewPanel({
   const [posting, setPosting] = useState<Set<number>>(new Set());
   const [posted, setPosted] = useState<Set<number>>(new Set());
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
+  const [previewingItems, setPreviewingItems] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const contextText = config.contextChunks
@@ -176,6 +180,15 @@ export function AnswerReviewPanel({
       await postAnswer(i);
     }
   }, [items, posted, postAnswer]);
+
+  const togglePreview = useCallback((index: number) => {
+    setPreviewingItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   const approvedCount = items.filter((i) => i.status === "approved").length;
   const postedCount = posted.size;
@@ -330,15 +343,45 @@ export function AnswerReviewPanel({
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">
-                        Draft Answer
-                      </p>
-                      <textarea
-                        value={item.editedAnswer}
-                        onChange={(e) => updateItemAnswer(i, e.target.value)}
-                        disabled={isPosted}
-                        className="w-full h-32 px-3 py-2 rounded-lg border border-border bg-white text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Draft Answer
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePreview(i);
+                          }}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          {previewingItems.has(i) ? (
+                            <>
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3" />
+                              Preview
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      {previewingItems.has(i) ? (
+                        <div className="w-full min-h-[8rem] max-h-64 overflow-y-auto px-3 py-2 rounded-lg border border-border bg-white text-sm prose-sm">
+                          <SimpleMarkdown
+                            text={item.editedAnswer || "*No answer yet*"}
+                            className="space-y-1.5 text-sm text-foreground leading-relaxed"
+                          />
+                        </div>
+                      ) : (
+                        <textarea
+                          value={item.editedAnswer}
+                          onChange={(e) => updateItemAnswer(i, e.target.value)}
+                          disabled={isPosted}
+                          className="w-full h-32 px-3 py-2 rounded-lg border border-border bg-white text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                        />
+                      )}
                     </div>
                     {item.status === "approved" && !isPosted && (
                       <button
