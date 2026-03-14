@@ -25,7 +25,7 @@ function stripXml(xml: string): string {
 
 interface Props {
   digests: CourseDigest[];
-  onSelectCourse: (courseId: number) => void;
+  onSelectCourse: (courseId: number, threadId?: number) => void;
   range: "day" | "week";
   courseColorMap: Map<number, number>;
   onSummaryGenerated?: (courseId: number, summary: string) => void;
@@ -38,9 +38,10 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
 
   useEffect(() => {
     for (const digest of digests) {
+      const hasSummary = summaries[digest.course.id] ?? digest.summary;
       if (
         fetchedRef.current.has(digest.course.id) ||
-        summaries[digest.course.id] ||
+        hasSummary ||
         digest.threads.length === 0
       )
         continue;
@@ -52,7 +53,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
         .slice(0, 20)
         .map(
           (t) =>
-            `- [${t.type}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_pinned ? " [PINNED]" : ""}${t.is_answered ? " [ANSWERED]" : ""}: ${stripXml(t.document || t.content).slice(0, 150)}`
+            `- [${t.type}] id=${t.id} number=${t.number} "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_pinned ? " [PINNED]" : ""}${t.is_answered ? " [ANSWERED]" : ""}: ${stripXml(t.document || t.content).slice(0, 150)}`
         )
         .join("\n");
 
@@ -61,8 +62,10 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system:
-            "You are a course digest summarizer. Highlight the most critical and actionable items: important announcements, deadline changes, unanswered questions needing attention, and key updates. Use 2-4 concise bullet points with plain text (use '- ' prefix). Keep it under 100 words. Prioritize what a student MUST know.",
+            "You are a course digest summarizer. Highlight the most critical and actionable items: important announcements, deadline changes, unanswered questions needing attention, and key updates. Use 2-4 concise bullet points with plain text (use '- ' prefix). Keep it under 100 words. Prioritize what a student MUST know. When a bullet relates to a specific thread, add a link at the end: [View #N](thread:COURSE_ID:THREAD_ID) where N is the thread number and THREAD_ID is the thread id.",
           prompt: `Summarize the most important recent activity for "${digest.course.code} - ${digest.course.name}" from the ${range === "day" ? "last 24 hours" : "last week"}:\n\n${threadData}`,
+          threadsWithIds: threadData,
+          courseId: digest.course.id,
         }),
       })
         .then((res) => (res.ok ? res.json() : null))
@@ -183,7 +186,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                 (t) => t.type === "post"
               ).length;
               const isLoading = loadingIds.has(digest.course.id);
-              const summary = summaries[digest.course.id];
+              const summary = summaries[digest.course.id] ?? digest.summary;
 
               return (
                 <button
@@ -244,6 +247,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                       {!isLoading && summary && (
                         <div
                           className={`text-xs leading-relaxed text-foreground/70 ${colors.accent} rounded-lg p-2.5 border ${colors.accentBorder}`}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center gap-1.5 mb-1">
                             <Sparkles
@@ -258,6 +262,9 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                           <SimpleMarkdown
                             text={summary}
                             className="space-y-1"
+                            onThreadLinkClick={(courseId, threadId) => {
+                              onSelectCourse(courseId, threadId);
+                            }}
                           />
                         </div>
                       )}

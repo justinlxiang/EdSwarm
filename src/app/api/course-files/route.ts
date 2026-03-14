@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText } from "ai";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function generateFileSummary(
+  sb: SupabaseClient,
+  fileId: number,
+  fileName: string,
+  fileContent: string
+) {
+  const { text } = await generateText({
+    model: anthropic("claude-haiku-4-5"),
+    system:
+      "Summarize this course material in 2-3 sentences. Focus on what topics and information it contains. Be specific about key details (dates, assignments, policies, concepts).",
+    prompt: `File: ${fileName}\n\n${fileContent.slice(0, 12000)}`,
+  });
+  await sb
+    .from("course_files")
+    .update({ file_summary: text })
+    .eq("id", fileId);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -77,6 +98,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Fire-and-forget: generate a summary so the upload returns immediately
+    generateFileSummary(sb, file.id, fileName, fileContent).catch(() => {});
 
     return NextResponse.json({ file });
   } catch (e: unknown) {

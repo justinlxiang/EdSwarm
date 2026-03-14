@@ -69,7 +69,6 @@ export function CourseMaterialsDialog({ courseId, open, onClose }: Props) {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isDemo) {
@@ -214,14 +213,8 @@ export function CourseMaterialsDialog({ courseId, open, onClose }: Props) {
   if (!open) return null;
 
   return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
-    >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-border/60 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}

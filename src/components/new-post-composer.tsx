@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { EdCourse, DuplicateMatch } from "@/lib/types";
 import { DEMO_TOKEN } from "@/lib/mock-data";
 import { addDemoThread } from "@/lib/demo-storage";
+import { useToken } from "@/lib/context";
+import { buildFileContext } from "@/lib/file-context";
 import {
   X,
   Send,
@@ -33,9 +35,11 @@ interface Props {
 type PostType = "question" | "post";
 
 export function NewPostComposer({ open, onClose, course, token }: Props) {
+  const { user, isDemo } = useToken();
   const [postType, setPostType] = useState<PostType>("question");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("General");
+  const [fileContextStr, setFileContextStr] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -50,6 +54,15 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isDemo) {
+      buildFileContext(course.id, 0, true).then(setFileContextStr);
+    } else if (user?.id) {
+      buildFileContext(course.id, user.id).then(setFileContextStr);
+    }
+  }, [open, course.id, user?.id, isDemo]);
 
   const categories =
     course.settings?.discussion?.categories?.map((c) => c.name) ?? ["General"];
@@ -79,11 +92,15 @@ export function NewPostComposer({ open, onClose, course, token }: Props) {
       ? `\n\nThe student has already written the following (take it into account and build on it):\n${contextParts.join("\n")}`
       : "";
 
+    const fileCtx = fileContextStr
+      ? `\n\nUse the following course materials as reference when relevant. If the draft draws on information from a specific file, mention it by name in the body (e.g. "As noted in the syllabus..." or "Referring to hw3_spec.md..."):\n${fileContextStr}`
+      : "";
+
     const draftPromise = fetch("/api/summarize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system: `You are helping a student draft a ${postType} for Ed Discussion in the course "${course.code} - ${course.name}". Output a JSON object with "title" and "body" keys. Generate a concise, descriptive "title". The "body" should be clear, well-structured HTML suitable for a rich text editor (use <p>, <strong>, <em>, <ul>/<li>, <h2>, <code> tags as appropriate). Output ONLY valid JSON, nothing else.`,
+        system: `You are helping a student draft a ${postType} for Ed Discussion in the course "${course.code} - ${course.name}". Output a JSON object with "title" and "body" keys. Generate a concise, descriptive "title". The "body" should be clear, well-structured HTML suitable for a rich text editor (use <p>, <strong>, <em>, <ul>/<li>, <h2>, <code> tags as appropriate). Output ONLY valid JSON, nothing else.${fileCtx}`,
         prompt: `Draft a ${postType} about: ${aiPrompt}${contextStr}`,
       }),
     });

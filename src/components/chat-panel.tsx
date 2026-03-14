@@ -15,6 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { FileDropZone, type FileItem } from "./file-drop-zone";
+import { fetchFileCatalog, buildDemoFileContext } from "@/lib/file-context";
+import { useChatContext } from "@/lib/chat-context";
 
 interface Props {
   open: boolean;
@@ -22,6 +24,10 @@ interface Props {
   context: string;
   token: string;
   courseName?: string;
+  courseId?: number;
+  edUserId?: number;
+  isDemo?: boolean;
+  chatKey: string;
 }
 
 function getMessageText(message: UIMessage): string {
@@ -31,11 +37,31 @@ function getMessageText(message: UIMessage): string {
     .join("");
 }
 
-export function ChatPanel({ open, onClose, context, courseName }: Props) {
+export function ChatPanel({ open, onClose, context, courseName, courseId, edUserId, isDemo, chatKey }: Props) {
+  const { getMessages, saveMessages } = useChatContext();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [showFileDrop, setShowFileDrop] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [fileContext, setFileContext] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevChatKeyRef = useRef<string | null>(null);
+  const isRestoringRef = useRef(false);
+
+  useEffect(() => {
+    if (!courseId) {
+      setFileContext("");
+      return;
+    }
+    if (isDemo) {
+      setFileContext(buildDemoFileContext(courseId));
+    } else if (edUserId) {
+      fetchFileCatalog(courseId, edUserId).then(({ catalogText }) => {
+        setFileContext(catalogText);
+      });
+    } else {
+      setFileContext("");
+    }
+  }, [courseId, edUserId, isDemo]);
 
   const courseInstruction = courseName
     ? `The student has opened this chat specifically for the course "${courseName}". Focus your answers on this course unless they ask about something else. When they say "this course" or "my class", they mean "${courseName}".`
@@ -46,6 +72,7 @@ You have access to recent threads, questions, and announcements from the student
 Be helpful, concise, and encourage learning. When referencing specific threads, mention their titles and numbers.
 If the student asks you to draft a question for Ed, format it clearly with a suggested title and body.
 If the student shares files (homework, projects), analyze them and help with questions.
+${fileContext ? `\nYou have access to uploaded course files. When your answer uses information from a file, reference it by name (e.g. "According to syllabus.md..." or "The homework spec mentions...") so the student knows the source.${isDemo ? "" : " Use the get_file_content tool to retrieve full file contents when only summaries are shown."}\n${fileContext}` : ""}
 
 ${courseInstruction}
 
@@ -56,9 +83,9 @@ ${context || "No specific course context loaded yet."}`;
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        body: { system: systemPrompt },
+        body: { system: systemPrompt, edUserId },
       }),
-    [systemPrompt]
+    [systemPrompt, edUserId]
   );
 
   const { messages, status, sendMessage, setMessages } = useChat({
@@ -66,6 +93,31 @@ ${context || "No specific course context loaded yet."}`;
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  // Restore messages when chatKey changes (switching course)
+  useEffect(() => {
+    if (prevChatKeyRef.current !== chatKey) {
+      isRestoringRef.current = true;
+      const prevKey = prevChatKeyRef.current;
+      if (prevKey !== null) {
+        saveMessages(prevKey, messages);
+      }
+      prevChatKeyRef.current = chatKey;
+      const stored = getMessages(chatKey);
+      setMessages(stored);
+      queueMicrotask(() => {
+        isRestoringRef.current = false;
+      });
+    }
+  }, [chatKey, messages, getMessages, saveMessages, setMessages]);
+
+  // Persist messages whenever they change (skip during restore to avoid saving wrong data)
+  useEffect(() => {
+    if (isRestoringRef.current) return;
+    if (messages.length > 0) {
+      saveMessages(chatKey, messages);
+    }
+  }, [chatKey, messages, saveMessages]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -93,6 +145,7 @@ ${context || "No specific course context loaded yet."}`;
 
   function handleClear() {
     setMessages([]);
+    saveMessages(chatKey, []);
     setFiles([]);
     setInputValue("");
   }

@@ -37,14 +37,16 @@ function stripXml(xml: string): string {
 }
 
 export function DigestView() {
-  const { token, user, courses, clearSession } = useToken();
+  const { token, user, courses, clearSession, isDemo } = useToken();
   const { digests, loading, error, fetchDigests, setDigests } =
     useCourseDigests();
   const [range, setRange] = useState<TimeRange>("day");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContext, setChatContext] = useState<string>("");
   const [chatCourseName, setChatCourseName] = useState<string | undefined>();
+  const [chatCourseId, setChatCourseId] = useState<number | undefined>();
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [expandThreadId, setExpandThreadId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedTerms, setExpandedTerms] = useState<Set<string> | null>(null);
   const [viewMode, setViewMode] = useState<"student" | "teacher">("student");
@@ -111,11 +113,12 @@ export function DigestView() {
     return "";
   }
 
-  function handleAskAbout(courseCode: string, _courseId: number) {
+  function handleAskAbout(courseCode: string, courseIdArg: number) {
     const courseDigest = digests.find((d) => d.course.code === courseCode);
     if (!courseDigest) return;
 
     setChatCourseName(`${courseCode} — ${courseDigest.course.name}`);
+    setChatCourseId(courseIdArg);
     setChatOpen(true);
 
     const recentFallback = courseDigest.threads
@@ -134,8 +137,9 @@ export function DigestView() {
       `Course: ${courseCode} - ${courseDigest.course.name}\n\nRecent threads:\n${recentFallback}`
     );
 
+    const fallbackLength = recentFallback.length;
     fetchFullContext([courseDigest.course.id]).then((full) => {
-      if (full) {
+      if (full && full.length > fallbackLength) {
         setChatContext(
           `Course: ${courseCode} - ${courseDigest.course.name}\n\nAll threads:\n${full}`
         );
@@ -155,11 +159,74 @@ export function DigestView() {
     }).catch(() => {});
   }
 
-  function handleSelectCourse(courseId: number) {
+  function handleSelectCourse(courseId: number, threadId?: number) {
     setSelectedCourseId(courseId);
+    setExpandThreadId(threadId ?? null);
     setSidebarOpen(false);
     syncCourseThreads(courseId);
   }
+
+  // Sync chat panel to current page when course changes (chat stays open, switches context)
+  const activeChatKey = selectedCourseId ? String(selectedCourseId) : "main";
+  useEffect(() => {
+    if (!chatOpen) return;
+    if (selectedCourseId === null) {
+      setChatCourseId(undefined);
+      setChatCourseName(undefined);
+      const richContext = digests
+        .map((d) => {
+          const threadList = d.threads
+            .slice(0, 20)
+            .map((t) => {
+              const body = stripXml(t.document || t.content).slice(0, 300);
+              let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+              if (t.answers && t.answers.length > 0) {
+                const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
+                line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+              }
+              return line;
+            })
+            .join("\n");
+          return `${d.course.code} - ${d.course.name} (${d.threads.length} recent threads):\n${threadList}`;
+        })
+        .join("\n\n");
+      setChatContext(richContext);
+      const allCourseIds = courses
+        .filter((cr) => cr.course.status === "active")
+        .map((cr) => cr.course.id);
+      fetchFullContext(allCourseIds).then((full) => {
+        if (full && full.length > richContext.length) setChatContext(full);
+      });
+    } else {
+      const digest = digests.find((d) => d.course.id === selectedCourseId);
+      if (digest) {
+        setChatCourseId(digest.course.id);
+        setChatCourseName(`${digest.course.code} — ${digest.course.name}`);
+        const recentFallback = digest.threads
+          .slice(0, 30)
+          .map((t) => {
+            const body = stripXml(t.document || t.content).slice(0, 300);
+            let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+            if (t.answers && t.answers.length > 0) {
+              const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
+              line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+            }
+            return line;
+          })
+          .join("\n");
+        setChatContext(
+          `Course: ${digest.course.code} - ${digest.course.name}\n\nRecent threads:\n${recentFallback}`
+        );
+        fetchFullContext([digest.course.id]).then((full) => {
+          if (full && full.length > recentFallback.length) {
+            setChatContext(
+              `Course: ${digest.course.code} - ${digest.course.name}\n\nAll threads:\n${full}`
+            );
+          }
+        });
+      }
+    }
+  }, [chatOpen, selectedCourseId, digests, courses]);
 
   const generateSummary = useCallback(
     async (digest: CourseDigest): Promise<string> => {
@@ -167,7 +234,7 @@ export function DigestView() {
         .slice(0, 30)
         .map(
           (t) =>
-            `- [${t.type}] "${t.title}" (${t.category}, ${t.reply_count} replies, ${t.vote_count} votes)${t.is_answered ? " [ANSWERED]" : ""}${t.is_pinned ? " [PINNED]" : ""}: ${stripXml(t.document || t.content).slice(0, 200)}`
+            `- [${t.type}] id=${t.id} number=${t.number} "${t.title}" (${t.category}, ${t.reply_count} replies, ${t.vote_count} votes)${t.is_answered ? " [ANSWERED]" : ""}${t.is_pinned ? " [PINNED]" : ""}: ${stripXml(t.document || t.content).slice(0, 200)}`
         )
         .join("\n");
 
@@ -178,6 +245,8 @@ export function DigestView() {
           courseCode: digest.course.code,
           courseName: digest.course.name,
           threads: threadData,
+          threadsWithIds: threadData,
+          courseId: digest.course.id,
         }),
       });
 
@@ -290,12 +359,19 @@ export function DigestView() {
                 <Menu className="w-5 h-5" />
               )}
             </button>
-            <h1
+            <div
               onClick={() => setShowLanding(true)}
-              className="text-xl font-bold text-foreground tracking-tight cursor-pointer hover:text-primary transition-colors"
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             >
-              Ed Swarm
-            </h1>
+              <img
+                src="/logo-inverted.png"
+                alt="Ed Swarm"
+                className="w-7 h-7"
+              />
+              <h1 className="text-xl font-bold text-foreground tracking-tight">
+                Ed Swarm
+              </h1>
+            </div>
             {user && (
               <span className="text-sm text-muted-foreground hidden sm:inline">
                 {user.name}
@@ -377,27 +453,33 @@ export function DigestView() {
                       handleAskAbout(selectedDigest.course.code, selectedDigest.course.id);
                     } else {
                       setChatCourseName(undefined);
+                      setChatCourseId(undefined);
                       setChatOpen(true);
 
-                      const briefContext = digests
+                      const richContext = digests
                         .map((d) => {
                           const threadList = d.threads
-                            .slice(0, 10)
-                            .map(
-                              (t) =>
-                                `  - "${t.title}" (${t.category}, ${t.reply_count} replies)`
-                            )
+                            .slice(0, 20)
+                            .map((t) => {
+                              const body = stripXml(t.document || t.content).slice(0, 300);
+                              let line = `[#${t.number}] "${t.title}" (${t.category}, ${t.reply_count} replies)${t.is_answered ? " [ANSWERED]" : ""}: ${body}`;
+                              if (t.answers && t.answers.length > 0) {
+                                const best = t.answers.find((a) => a.is_endorsed) ?? t.answers[0];
+                                line += `\n  → Answer: ${stripXml(best.document || best.content).slice(0, 300)}`;
+                              }
+                              return line;
+                            })
                             .join("\n");
-                          return `${d.course.code} - ${d.course.name}:\n${threadList}`;
+                          return `${d.course.code} - ${d.course.name} (${d.threads.length} recent threads):\n${threadList}`;
                         })
                         .join("\n\n");
-                      setChatContext(briefContext);
+                      setChatContext(richContext);
 
                       const allCourseIds = courses
                         .filter((cr) => cr.course.status === "active")
                         .map((cr) => cr.course.id);
                       fetchFullContext(allCourseIds).then((full) => {
-                        if (full) setChatContext(full);
+                        if (full && full.length > richContext.length) setChatContext(full);
                       });
                     }
                   }}
@@ -453,11 +535,12 @@ export function DigestView() {
             }`}
           >
             <nav className="p-3 space-y-1">
-              <button
-                onClick={() => {
-                  setSelectedCourseId(null);
-                  setSidebarOpen(false);
-                }}
+            <button
+              onClick={() => {
+                setSelectedCourseId(null);
+                setExpandThreadId(null);
+                setSidebarOpen(false);
+              }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedCourseId === null
                     ? "bg-primary/10 text-primary"
@@ -643,6 +726,10 @@ export function DigestView() {
                   colorIndex={selectedColorIndex}
                   onAskAbout={handleAskAbout}
                   onGenerateSummary={generateSummary}
+                  expandThreadId={expandThreadId}
+                  onThreadLinkClick={(courseId, threadId) => {
+                    handleSelectCourse(courseId, threadId);
+                  }}
                 />
               )}
 
@@ -669,13 +756,19 @@ export function DigestView() {
             </div>
           </main>
 
-          <ChatPanel
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-            context={chatContext}
-            token={token}
-            courseName={chatCourseName}
-          />
+          {chatOpen && (
+            <ChatPanel
+              open={true}
+              onClose={() => setChatOpen(false)}
+              context={chatContext}
+              token={token}
+              courseName={chatCourseName}
+              courseId={chatCourseId}
+              edUserId={user?.id}
+              chatKey={activeChatKey}
+              isDemo={isDemo}
+            />
+          )}
         </div>
       )}
     </div>

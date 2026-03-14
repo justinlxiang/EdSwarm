@@ -116,9 +116,11 @@ function CommentBubble({
 interface ThreadCardProps {
   thread: EdThread;
   token: string;
+  expandThreadId?: number | null;
+  threadRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function ThreadCard({ thread, token }: ThreadCardProps) {
+export function ThreadCard({ thread, token, expandThreadId, threadRef }: ThreadCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<EdThreadDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -160,6 +162,13 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
     setExpanded(next);
     if (next) fetchDetail();
   }
+
+  useEffect(() => {
+    if (expandThreadId === thread.id && !expanded) {
+      setExpanded(true);
+      fetchDetail();
+    }
+  }, [expandThreadId, thread.id]);
 
   useEffect(() => {
     if (aiResponse) {
@@ -313,6 +322,8 @@ export function ThreadCard({ thread, token }: ThreadCardProps) {
 
   return (
     <div
+      ref={threadRef}
+      data-thread-id={thread.id}
       className={`border rounded-xl transition-all ${
         expanded
           ? "border-primary/30 shadow-md bg-white"

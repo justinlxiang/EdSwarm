@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       `<student_question>\nTitle: ${questionTitle}\n\n${questionContent}\n</student_question>`
     );
     parts.push(
-      "Please provide a helpful answer to this student question. Be concise and accurate. Use the course context if relevant."
+      "Please provide a helpful answer to this student question. Be concise and accurate. Use the course context if relevant. When your answer draws on information from an uploaded course file, reference it by name (e.g. \"According to the syllabus...\" or \"As described in hw3_spec.md...\") so the student knows where to find more detail."
     );
 
     const { text } = await generateText({

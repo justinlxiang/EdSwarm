@@ -42,3 +42,6 @@ next-env.d.ts
 
 # thread cache
 data/threads/
+
+# cursor
+.cursor/

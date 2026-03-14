@@ -1,9 +1,61 @@
 import React from "react";
 
-function parseInline(text: string): React.ReactNode[] {
+const THREAD_LINK_RE = /\[([^\]]+)\]\((thread:(\d+):(\d+))\)/g;
+
+function parseInline(
+  text: string,
+  options?: { onThreadLink?: (courseId: number, threadId: number) => void; keyRef?: { current: number } }
+): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let remaining = text;
-  let key = 0;
+  const keyRef = options?.keyRef ?? { current: 0 };
+  let key = () => keyRef.current++;
+
+  // First, handle thread links - they take precedence
+  const re = new RegExp(THREAD_LINK_RE.source, "g");
+  const threadMatch = re.exec(remaining);
+  if (threadMatch && options?.onThreadLink) {
+    const allMatches: RegExpExecArray[] = [threadMatch];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(remaining)) !== null) allMatches.push(m);
+    let lastIndex = 0;
+    for (const match of allMatches) {
+      if (match.index > lastIndex) {
+        nodes.push(
+          ...parseInline(remaining.slice(lastIndex, match.index), { keyRef })
+        );
+      }
+      const [, linkText, , courseIdStr, threadIdStr] = match;
+      const courseId = parseInt(courseIdStr, 10);
+      const threadId = parseInt(threadIdStr, 10);
+      nodes.push(
+        <span
+          key={key()}
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            options.onThreadLink?.(courseId, threadId);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              options.onThreadLink?.(courseId, threadId);
+            }
+          }}
+          className="text-primary hover:underline font-medium inline cursor-pointer"
+        >
+          {linkText}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < remaining.length) {
+      nodes.push(...parseInline(remaining.slice(lastIndex), { keyRef }));
+    }
+    return nodes;
+  }
 
   while (remaining.length > 0) {
     const patterns: { idx: number; type: string; marker: string }[] = [];
@@ -44,15 +96,15 @@ function parseInline(text: string): React.ReactNode[] {
     const inner = after.slice(0, endIdx);
 
     if (first.type === "bold") {
-      nodes.push(<strong key={key++} className="font-semibold">{inner}</strong>);
+      nodes.push(<strong key={key()} className="font-semibold">{inner}</strong>);
     } else if (first.type === "code") {
       nodes.push(
-        <code key={key++} className="px-1 py-0.5 rounded bg-black/5 text-[0.9em] font-mono">
+        <code key={key()} className="px-1 py-0.5 rounded bg-black/5 text-[0.9em] font-mono">
           {inner}
         </code>
       );
     } else {
-      nodes.push(<em key={key++}>{inner}</em>);
+      nodes.push(<em key={key()}>{inner}</em>);
     }
 
     remaining = after.slice(endIdx + first.marker.length);
@@ -64,14 +116,23 @@ function parseInline(text: string): React.ReactNode[] {
 interface Props {
   text: string;
   className?: string;
+  onThreadLinkClick?: (courseId: number, threadId: number) => void;
 }
 
-export function SimpleMarkdown({ text, className }: Props) {
+export function SimpleMarkdown({ text, className, onThreadLinkClick }: Props) {
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   let listItems: React.ReactNode[] = [];
   let blockquoteLines: string[] = [];
   let key = 0;
+  const inlineKeyRef = { current: 0 };
+  const parseOpts = onThreadLinkClick
+    ? { onThreadLink: onThreadLinkClick, keyRef: inlineKeyRef }
+    : { keyRef: inlineKeyRef };
+
+  function parse(content: string) {
+    return parseInline(content, parseOpts);
+  }
 
   function flushList() {
     if (listItems.length > 0) {
@@ -92,7 +153,7 @@ export function SimpleMarkdown({ text, className }: Props) {
           className="border-l-2 border-primary/30 pl-3 text-foreground/70 italic"
         >
           {blockquoteLines.map((l, i) => (
-            <p key={i}>{parseInline(l)}</p>
+            <p key={i}>{parse(l)}</p>
           ))}
         </blockquote>
       );
@@ -140,7 +201,7 @@ export function SimpleMarkdown({ text, className }: Props) {
                 : "font-medium text-foreground"
           }
         >
-          {parseInline(heading)}
+          {parse(heading)}
         </p>
       );
     } else if (/^\s*[-*]\s/.test(line)) {
@@ -149,23 +210,23 @@ export function SimpleMarkdown({ text, className }: Props) {
       if (indent >= 2) {
         listItems.push(
           <li key={key++} className="ml-4 list-[circle]">
-            {parseInline(content)}
+            {parse(content)}
           </li>
         );
       } else {
-        listItems.push(<li key={key++}>{parseInline(content)}</li>);
+        listItems.push(<li key={key++}>{parse(content)}</li>);
       }
     } else if (/^\d+\.\s/.test(trimmed)) {
       flushList();
       const content = trimmed.replace(/^\d+\.\s+/, "");
       elements.push(
         <p key={key++}>
-          {trimmed.match(/^(\d+\.)\s/)![1]} {parseInline(content)}
+          {trimmed.match(/^(\d+\.)\s/)![1]} {parse(content)}
         </p>
       );
     } else {
       flushList();
-      elements.push(<p key={key++}>{parseInline(trimmed)}</p>);
+      elements.push(<p key={key++}>{parse(trimmed)}</p>);
     }
   }
 

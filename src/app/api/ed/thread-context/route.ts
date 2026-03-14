@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      context: sections.join("\n\n") || "No cached threads available.",
+      context: sections.join("\n\n"),
     });
   } catch (e: unknown) {
     const message =

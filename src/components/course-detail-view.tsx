@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { CourseDigest as CourseDigestType } from "@/lib/types";
 import { ThreadCard } from "./thread-card";
 import { COURSE_COLORS } from "./course-digest";
@@ -22,6 +22,8 @@ interface Props {
   colorIndex: number;
   onAskAbout: (courseCode: string, courseId: number) => void;
   onGenerateSummary: (digest: CourseDigestType) => Promise<string>;
+  expandThreadId?: number | null;
+  onThreadLinkClick?: (courseId: number, threadId: number) => void;
 }
 
 export function CourseDetailView({
@@ -30,13 +32,33 @@ export function CourseDetailView({
   colorIndex,
   onAskAbout,
   onGenerateSummary,
+  expandThreadId,
+  onThreadLinkClick,
 }: Props) {
   const [summary, setSummary] = useState(digest.summary || "");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const threadRefsMap = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const colors = COURSE_COLORS[colorIndex % COURSE_COLORS.length];
+
+  function setThreadRef(threadId: number) {
+    return (el: HTMLDivElement | null) => {
+      if (el) threadRefsMap.current.set(threadId, el);
+      else threadRefsMap.current.delete(threadId);
+    };
+  }
+
+  useEffect(() => {
+    if (!expandThreadId) return;
+    const el = threadRefsMap.current.get(expandThreadId);
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [expandThreadId]);
 
   const questions = digest.threads.filter((t) => t.type === "question").length;
   const posts = digest.threads.filter((t) => t.type === "post").length;
@@ -141,13 +163,20 @@ export function CourseDetailView({
           <SimpleMarkdown
             text={summary}
             className="text-sm text-foreground/80 leading-relaxed space-y-1.5"
+            onThreadLinkClick={onThreadLinkClick}
           />
         </div>
       )}
 
       <div className="space-y-2.5">
         {digest.threads.map((thread) => (
-          <ThreadCard key={thread.id} thread={thread} token={token} />
+          <ThreadCard
+            key={thread.id}
+            thread={thread}
+            token={token}
+            expandThreadId={expandThreadId}
+            threadRef={setThreadRef(thread.id)}
+          />
         ))}
       </div>
 
