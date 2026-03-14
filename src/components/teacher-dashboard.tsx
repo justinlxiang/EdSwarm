@@ -114,31 +114,32 @@ export function TeacherDashboard() {
             </p>
             <div className="space-y-3">
               {crs.map((cr) => (
-                <AgentConfigCard
-                  key={cr.course.id}
-                  course={cr.course}
-                  roleLabel={roleName(cr.role.role)}
-                  token={token}
-                  onStartAnswering={handleStartAnswering(
-                    cr.course.id,
-                    `${cr.course.code} — ${cr.course.name}`
+                <div key={cr.course.id} className="space-y-3">
+                  <AgentConfigCard
+                    course={cr.course}
+                    roleLabel={roleName(cr.role.role)}
+                    token={token}
+                    onStartAnswering={handleStartAnswering(
+                      cr.course.id,
+                      `${cr.course.code} — ${cr.course.name}`
+                    )}
+                  />
+                  {reviewState && reviewState.courseId === cr.course.id && (
+                    <AnswerReviewPanel
+                      threads={reviewState.threads}
+                      config={reviewState.config}
+                      courseName={reviewState.courseName}
+                      token={token}
+                      onClose={() => setReviewState(null)}
+                    />
                   )}
-                />
+                </div>
               ))}
             </div>
           </div>
         ))}
       </div>
 
-      {reviewState && (
-        <AnswerReviewPanel
-          threads={reviewState.threads}
-          config={reviewState.config}
-          courseName={reviewState.courseName}
-          token={token}
-          onClose={() => setReviewState(null)}
-        />
-      )}
     </div>
   );
 }

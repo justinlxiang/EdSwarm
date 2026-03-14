@@ -182,29 +182,28 @@ export function AnswerReviewPanel({
   const pendingCount = items.filter((i) => i.status === "pending").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col mx-4">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border/40 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              Answer Review — {courseName}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {threads.length} unanswered question{threads.length !== 1 && "s"}{" "}
-              found
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <div className="bg-white rounded-2xl border border-primary/20 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">
+            Answer Review
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {threads.length} unanswered question{threads.length !== 1 && "s"}{" "}
+            found
+          </p>
         </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+      {/* Body */}
+      <div className="px-5 py-4 space-y-3">
           {threads.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <MessageSquare className="w-10 h-10 text-muted-foreground/30" />
@@ -256,9 +255,12 @@ export function AnswerReviewPanel({
                       : "border-border/60 bg-white"
                 }`}
               >
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setExpandedItem(isExpanded ? null : i)}
-                  className="w-full px-4 py-3 flex items-center gap-3 text-left"
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedItem(isExpanded ? null : i); } }}
+                  className="w-full px-4 py-3 flex items-center gap-3 text-left cursor-pointer"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -314,7 +316,7 @@ export function AnswerReviewPanel({
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
-                </button>
+                </div>
 
                 {isExpanded && (
                   <div className="px-4 pb-4 space-y-3 border-t border-border/30 pt-3">
@@ -365,44 +367,43 @@ export function AnswerReviewPanel({
           )}
         </div>
 
-        {/* Footer */}
-        {generationDone && items.length > 0 && (
-          <div className="px-6 py-4 border-t border-border/40 flex items-center justify-between shrink-0">
-            <div className="text-sm text-muted-foreground">
-              {approvedCount} approved · {postedCount} posted · {pendingCount}{" "}
-              pending
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={dismissAll}
-                disabled={pendingCount === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
-              >
-                <XOctagon className="w-3.5 h-3.5" />
-                Dismiss All
-              </button>
-              <button
-                onClick={approveAll}
-                disabled={pendingCount === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 text-sm text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 transition-colors"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                Approve All
-              </button>
-              <button
-                onClick={postAllApproved}
-                disabled={
-                  approvedCount === 0 || approvedCount === postedCount
-                }
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-40 transition-colors"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Post All Approved
-              </button>
-            </div>
+      {/* Footer */}
+      {generationDone && items.length > 0 && (
+        <div className="px-5 py-4 border-t border-border/40 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            {approvedCount} approved · {postedCount} posted · {pendingCount}{" "}
+            pending
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={dismissAll}
+              disabled={pendingCount === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+            >
+              <XOctagon className="w-3.5 h-3.5" />
+              Dismiss All
+            </button>
+            <button
+              onClick={approveAll}
+              disabled={pendingCount === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 text-sm text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 transition-colors"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Approve All
+            </button>
+            <button
+              onClick={postAllApproved}
+              disabled={
+                approvedCount === 0 || approvedCount === postedCount
+              }
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-40 transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Post All Approved
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
