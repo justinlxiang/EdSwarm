@@ -129,3 +129,68 @@ export interface CourseDigest {
 }
 
 export type TimeRange = "day" | "week";
+
+export interface AgentContextChunk {
+  name: string;
+  content: string;
+}
+
+export interface AgentConfig {
+  instructions: string;
+  contextChunks: AgentContextChunk[];
+  allowedCategories: string[];
+  blockedCategories: string[];
+  autoAnswerEnabled: boolean;
+}
+
+export interface DraftAnswer {
+  threadId: number;
+  threadTitle: string;
+  threadContent: string;
+  category: string;
+  answer: string;
+}
+
+export interface AnswerReviewItem extends DraftAnswer {
+  status: "pending" | "approved" | "dismissed";
+  editedAnswer: string;
+}
+
+export interface CachedThreadAnswer {
+  userId: number;
+  text: string;
+  isEndorsed: boolean;
+}
+
+export interface CachedThread {
+  id: number;
+  number: number;
+  title: string;
+  contentText: string;
+  category: string;
+  type: string;
+  isAnswered: boolean;
+  createdAt: string;
+  answers: CachedThreadAnswer[];
+}
+
+export interface ThreadCacheFile {
+  courseId: number;
+  syncedAt: string;
+  threadCount: number;
+  threads: CachedThread[];
+}
+
+export interface DuplicateMatch {
+  threadId: number;
+  threadNumber: number;
+  title: string;
+  relevance: "exact_duplicate" | "likely_answered" | "related";
+  answerSnippet: string;
+  explanation: string;
+}
+
+export interface DuplicateCheckResult {
+  hasDuplicates: boolean;
+  matches: DuplicateMatch[];
+}
