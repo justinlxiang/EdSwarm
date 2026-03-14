@@ -50,6 +50,26 @@ export async function postThread(
   });
 }
 
+export async function postComment(
+  token: string,
+  threadId: number,
+  content: string,
+  document: string
+) {
+  return edFetch(`/api/threads/${threadId}/comments`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      comment: {
+        type: "answer",
+        content,
+        document,
+        is_anonymous: false,
+        is_private: false,
+      },
+    }),
+  });
+}
+
 export async function uploadFile(
   token: string,
   file: ArrayBuffer,
