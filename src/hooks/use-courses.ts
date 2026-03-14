@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from "react";
 import type { EdCourseRole, EdThread, CourseDigest, TimeRange } from "@/lib/types";
+import { DEMO_TOKEN } from "@/lib/mock-data";
+import { getDemoThreads } from "@/lib/demo-storage";
 
 function filterThreadsByTime(threads: EdThread[], range: TimeRange): EdThread[] {
   const now = new Date();
@@ -27,6 +29,20 @@ export function useCourseDigests() {
         const activeCourses = courses.filter(
           (c) => c.course.status === "active"
         );
+
+        if (token === DEMO_TOKEN) {
+          const all: CourseDigest[] = activeCourses.map((cr) => {
+            const threads = getDemoThreads().filter(
+              (t) => t.course_id === cr.course.id
+            );
+            const filtered = filterThreadsByTime(threads, range);
+            return { course: cr.course, threads: filtered };
+          });
+          all.sort((a, b) => b.threads.length - a.threads.length);
+          setDigests(all);
+          setLoading(false);
+          return;
+        }
 
         const results = await Promise.allSettled(
           activeCourses.map(async (cr) => {

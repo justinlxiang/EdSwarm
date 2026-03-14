@@ -8,11 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import type { EdUser, EdCourseRole } from "./types";
+import { DEMO_TOKEN } from "./mock-data";
 
 interface TokenContextValue {
   token: string | null;
   user: EdUser | null;
   courses: EdCourseRole[];
+  isDemo: boolean;
   setSession: (token: string, user: EdUser, courses: EdCourseRole[]) => void;
   clearSession: () => void;
 }
@@ -41,7 +43,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
 
   return (
     <TokenContext.Provider
-      value={{ token, user, courses, setSession, clearSession }}
+      value={{ token, user, courses, isDemo: token === DEMO_TOKEN, setSession, clearSession }}
     >
       {children}
     </TokenContext.Provider>

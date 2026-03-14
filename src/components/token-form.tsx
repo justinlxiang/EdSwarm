@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToken } from "@/lib/context";
-import { KeyRound, ArrowRight, Loader2, ExternalLink } from "lucide-react";
+import { KeyRound, ArrowRight, Loader2, ExternalLink, Play } from "lucide-react";
+import { DEMO_TOKEN, DEMO_USER, DEMO_COURSE_ROLES } from "@/lib/mock-data";
 
 export function TokenForm() {
   const [input, setInput] = useState("");
@@ -111,6 +112,17 @@ export function TokenForm() {
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </form>
+
+        <button
+          onClick={() => {
+            setSession(DEMO_TOKEN, DEMO_USER, DEMO_COURSE_ROLES);
+            router.push("/digest");
+          }}
+          className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-medium hover:bg-primary/5 hover:border-primary/50 transition-colors"
+        >
+          <Play className="w-4 h-4" />
+          Try Demo (no API token needed)
+        </button>
       </div>
     </div>
   );
