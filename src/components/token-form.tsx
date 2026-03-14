@@ -35,7 +35,7 @@ export function TokenForm() {
 
       const data = await res.json();
       setSession(trimmed, data.user, data.courses);
-      router.push("/digest");
+      router.push("/platform");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to validate token");
     } finally {
@@ -96,7 +96,7 @@ export function TokenForm() {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                Continue to Digest
+                Continue to Platform
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -116,7 +116,7 @@ export function TokenForm() {
         <button
           onClick={() => {
             setSession(DEMO_TOKEN, DEMO_USER, DEMO_COURSE_ROLES);
-            router.push("/digest");
+            router.push("/platform");
           }}
           className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-medium hover:bg-primary/5 hover:border-primary/50 transition-colors"
         >

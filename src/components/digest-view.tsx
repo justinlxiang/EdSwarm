@@ -9,7 +9,7 @@ import { HomeOverview } from "./home-overview";
 import { CourseDetailView } from "./course-detail-view";
 import { ChatPanel } from "./chat-panel";
 import { TeacherDashboard } from "./teacher-dashboard";
-import { LandingPage } from "./landing-page";
+import { TokenForm } from "./token-form";
 import {
   Calendar,
   CalendarDays,
@@ -50,7 +50,6 @@ export function DigestView() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedTerms, setExpandedTerms] = useState<Set<string> | null>(null);
   const [viewMode, setViewMode] = useState<"student" | "teacher">("student");
-  const [showLanding, setShowLanding] = useState(false);
   const router = useRouter();
 
   const isStaff = useMemo(
@@ -58,12 +57,20 @@ export function DigestView() {
     [courses]
   );
   const hasFetched = useRef(false);
+  const syncedCourses = useRef(new Set<number>());
+
+  function syncCourseThreads(courseId: number) {
+    if (!token || syncedCourses.current.has(courseId)) return;
+    syncedCourses.current.add(courseId);
+    fetch("/api/ed/sync-threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, courseId }),
+    }).catch(() => {});
+  }
 
   useEffect(() => {
-    if (!token) {
-      router.push("/");
-      return;
-    }
+    if (!token) return;
     if (!hasFetched.current) {
       hasFetched.current = true;
       fetchDigests(token, courses, range);
@@ -73,7 +80,7 @@ export function DigestView() {
         }
       }
     }
-  }, [token, courses, range, fetchDigests, router]);
+  }, [token, courses, range, fetchDigests]);
 
   function handleRangeChange(newRange: TimeRange) {
     if (newRange === range) return;
@@ -154,18 +161,6 @@ export function DigestView() {
         if (full) setChatContext(`Course: ${course.code} - ${course.name}\n\nAll threads:\n${full}`);
       });
     }
-  }
-
-  const syncedCourses = useRef(new Set<number>());
-
-  function syncCourseThreads(courseId: number) {
-    if (!token || syncedCourses.current.has(courseId)) return;
-    syncedCourses.current.add(courseId);
-    fetch("/api/ed/sync-threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, courseId }),
-    }).catch(() => {});
   }
 
   function handleSelectCourse(courseId: number, threadId?: number) {
@@ -335,7 +330,9 @@ export function DigestView() {
     return map;
   }, [courses]);
 
-  if (!token) return null;
+  if (!token) {
+    return <TokenForm />;
+  }
 
   const activeCourseCount = courses.filter(
     (c) => c.course.status === "active"
@@ -378,7 +375,7 @@ export function DigestView() {
               )}
             </button>
             <div
-              onClick={() => setShowLanding(true)}
+              onClick={() => router.push("/")}
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <img
@@ -557,15 +554,7 @@ export function DigestView() {
       </header>
 
       <div className="pt-[57px]">
-      {showLanding ? (
-        <LandingPage
-          onEnterDashboard={() => {
-            setShowLanding(false);
-            setSelectedCourseId(null);
-          }}
-          userName={user?.name}
-        />
-      ) : viewMode === "teacher" ? (
+      {viewMode === "teacher" ? (
         <main className="flex-1 min-w-0 p-6 lg:p-8">
           <TeacherDashboard />
         </main>
