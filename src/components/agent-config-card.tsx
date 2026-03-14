@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { EdCourse, EdCategory, AgentConfig, EdThread } from "@/lib/types";
-import { getAgentConfig, saveAgentConfig, clearAgentConfig } from "@/lib/agent-storage";
 import { getDemoFileChunks } from "@/lib/file-context";
 import { DEMO_TOKEN } from "@/lib/mock-data";
 import { getDemoThreads } from "@/lib/demo-storage";
 import { useToken } from "@/lib/context";
 import { useCourseFiles } from "@/hooks/use-course-files";
+import { useAgentConfig } from "@/hooks/use-agent-config";
 import {
   Settings,
   Upload,
@@ -56,34 +56,30 @@ interface Props {
 export function AgentConfigCard({ course, roleLabel, token, onStartAnswering }: Props) {
   const { user, isDemo } = useToken();
   const [expanded, setExpanded] = useState(false);
-  const [config, setConfig] = useState<AgentConfig>(() => getAgentConfig(course.id));
+  const edUserId = isDemo ? null : user?.id ?? null;
+  const { config, setConfig, saveConfig, resetConfig } = useAgentConfig(course.id, edUserId);
   const [saved, setSaved] = useState(false);
   const [fetchingThreads, setFetchingThreads] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { files: cloudFiles, uploadFile, deleteFile, loading: filesLoading } = useCourseFiles(
     course.id,
-    isDemo ? null : user?.id ?? null
+    edUserId
   );
 
   const categories = course.settings?.discussion?.categories
     ? flattenCategories(course.settings.discussion.categories as EdCategory[])
     : [];
 
-  useEffect(() => {
-    setConfig(getAgentConfig(course.id));
-  }, [course.id]);
-
-  const handleSave = useCallback(() => {
-    saveAgentConfig(course.id, config);
+  const handleSave = useCallback(async () => {
+    await saveConfig(config);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  }, [course.id, config]);
+  }, [config, saveConfig]);
 
-  const handleReset = useCallback(() => {
-    clearAgentConfig(course.id);
-    setConfig(getAgentConfig(course.id));
-  }, [course.id]);
+  const handleReset = useCallback(async () => {
+    await resetConfig();
+  }, [resetConfig]);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,14 +195,14 @@ export function AgentConfigCard({ course, roleLabel, token, onStartAnswering }: 
         ];
       }
 
-      saveAgentConfig(course.id, config);
+      saveConfig(config);
       onStartAnswering(unanswered, mergedConfig);
     } catch (err) {
       console.error("Failed to fetch threads:", err);
     } finally {
       setFetchingThreads(false);
     }
-  }, [token, course.id, config, onStartAnswering, cloudFiles, user, isDemo]);
+  }, [token, course.id, config, onStartAnswering, cloudFiles, user, isDemo, saveConfig]);
 
   const hasConfig = config.instructions.trim().length > 0;
 
