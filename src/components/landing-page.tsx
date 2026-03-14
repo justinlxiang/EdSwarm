@@ -272,6 +272,9 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
             <span className="font-semibold text-foreground">answer at scale</span> — all in
             one beautiful interface.
           </p>
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+            Save teaching staff <span className="font-semibold text-foreground">5–10 hours per week</span> by automating repetitive Q&A, reducing duplicate posts, and letting AI handle the first pass — so instructors can focus on what matters most. Students save <span className="font-semibold text-foreground">2–3 hours per week</span> by getting instant, accurate answers instead of waiting hours for a reply.
+          </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
