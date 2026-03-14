@@ -44,7 +44,9 @@ export async function POST(req: NextRequest) {
     let allThreads: CachedThread[];
 
     if (token === DEMO_TOKEN) {
-      allThreads = SEED_THREADS.map(threadToCached);
+      allThreads = SEED_THREADS
+        .filter((t) => t.course_id === courseId)
+        .map(threadToCached);
     } else {
       allThreads = [];
       let offset = 0;

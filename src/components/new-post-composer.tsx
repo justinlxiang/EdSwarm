@@ -224,9 +224,10 @@ export function NewPostComposer({ open, onClose, course, token, onPostSuccess }:
   }
 
   async function handleSubmit() {
-    if (!title.trim() || isEditorEmpty() || posting || checkingDuplicates) return;
+    if (!title.trim() || posting || checkingDuplicates) return;
 
     if (duplicateMatches !== null) {
+      if (isEditorEmpty()) return;
       await doPost();
       return;
     }
@@ -259,6 +260,7 @@ export function NewPostComposer({ open, onClose, course, token, onPostSuccess }:
     }
 
     setCheckingDuplicates(false);
+    if (isEditorEmpty()) return;
     await doPost();
   }
 
