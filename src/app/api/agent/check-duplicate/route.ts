@@ -2,10 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, tool, stepCountIs } from "ai";
 import { z } from "zod";
-import { searchCache, getThreadFromCache } from "@/lib/thread-cache";
 import type { DuplicateCheckResult, DuplicateMatch } from "@/lib/types";
 
 export const maxDuration = 60;
+
+interface InlineThread {
+  id: number;
+  number: number;
+  title: string;
+  content: string;
+  category: string;
+  is_answered: boolean;
+  answers: { text: string; is_endorsed: boolean }[];
+}
+
+function searchThreads(
+  threads: InlineThread[],
+  query: string
+): InlineThread[] {
+  const keywords = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  if (keywords.length === 0) return [];
+
+  const scored = threads.map((t) => {
+    const haystack = `${t.title} ${t.content}`.toLowerCase();
+    let score = 0;
+    for (const kw of keywords) {
+      if (haystack.includes(kw)) score++;
+    }
+    if (t.title.toLowerCase().includes(query.toLowerCase())) score += 3;
+    return { thread: t, score };
+  });
+
+  return scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((s) => s.thread);
+}
 
 const SYSTEM_PROMPT = `You are a duplicate-question detector for an Ed Discussion course forum.
 
@@ -46,7 +83,8 @@ Set hasDuplicates to true if ANY match has relevance "exact_duplicate" or "likel
 
 export async function POST(req: NextRequest) {
   try {
-    const { courseId, questionTitle, questionContent } = await req.json();
+    const { courseId, questionTitle, questionContent, threads: rawThreads } =
+      await req.json();
 
     if (!courseId || (!questionTitle && !questionContent)) {
       return NextResponse.json(
@@ -55,7 +93,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const searchHits = new Map<number, { threadId: number; threadNumber: number; title: string; isAnswered: boolean; snippet: string }>();
+    const threads: InlineThread[] = Array.isArray(rawThreads) ? rawThreads : [];
+
+    if (threads.length === 0) {
+      return NextResponse.json({ hasDuplicates: false, matches: [] });
+    }
+
+    const threadMap = new Map<number, InlineThread>();
+    for (const t of threads) threadMap.set(t.id, t);
+
+    const searchHits = new Map<
+      number,
+      { threadId: number; threadNumber: number; title: string; isAnswered: boolean; snippet: string }
+    >();
 
     const { text, steps } = await generateText({
       model: anthropic("claude-haiku-4-5"),
@@ -65,20 +115,18 @@ export async function POST(req: NextRequest) {
           description:
             "Search past course threads by keywords. Use short 2-4 word queries.",
           inputSchema: z.object({
-            query: z
-              .string()
-              .describe("Short keyword query (2-4 words)"),
+            query: z.string().describe("Short keyword query (2-4 words)"),
           }),
           execute: async ({ query }) => {
-            const results = searchCache(courseId, query);
+            const results = searchThreads(threads, query);
             for (const r of results) {
               if (!searchHits.has(r.id)) {
                 searchHits.set(r.id, {
                   threadId: r.id,
                   threadNumber: r.number,
                   title: r.title,
-                  isAnswered: r.isAnswered,
-                  snippet: r.snippet,
+                  isAnswered: r.is_answered,
+                  snippet: r.content.slice(0, 200),
                 });
               }
             }
@@ -89,8 +137,8 @@ export async function POST(req: NextRequest) {
                 threadId: r.id,
                 threadNumber: r.number,
                 title: r.title,
-                snippet: r.snippet,
-                isAnswered: r.isAnswered,
+                snippet: r.content.slice(0, 200),
+                isAnswered: r.is_answered,
                 category: r.category,
               })),
             };
@@ -103,19 +151,18 @@ export async function POST(req: NextRequest) {
             threadId: z.number().describe("The thread ID to retrieve"),
           }),
           execute: async ({ threadId }) => {
-            const thread = getThreadFromCache(courseId, threadId);
-            if (!thread)
-              return { error: "Thread not found in cache" };
+            const thread = threadMap.get(threadId);
+            if (!thread) return { error: "Thread not found" };
             return {
               id: thread.id,
               number: thread.number,
               title: thread.title,
-              content: thread.contentText,
+              content: thread.content,
               category: thread.category,
-              isAnswered: thread.isAnswered,
+              isAnswered: thread.is_answered,
               answers: thread.answers.map((a) => ({
                 text: a.text,
-                isEndorsed: a.isEndorsed,
+                isEndorsed: a.is_endorsed,
               })),
             };
           },
@@ -127,13 +174,11 @@ export async function POST(req: NextRequest) {
 
     let result: DuplicateCheckResult | null = null;
 
-    // Try parsing the final text response
     if (text) {
       try {
         const cleaned = text.replace(/```json\s*|\s*```/g, "").trim();
         result = JSON.parse(cleaned);
       } catch {
-        // Try to find JSON anywhere in the text
         const jsonMatch = text.match(/\{[\s\S]*"hasDuplicates"[\s\S]*\}/);
         if (jsonMatch) {
           try {
@@ -143,12 +188,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Also check steps for any text that contains JSON (in case last step had it)
     if (!result && steps) {
       for (const step of [...steps].reverse()) {
         if (step.text) {
           try {
-            const cleaned = step.text.replace(/```json\s*|\s*```/g, "").trim();
+            const cleaned = step.text
+              .replace(/```json\s*|\s*```/g, "")
+              .trim();
             const parsed = JSON.parse(cleaned);
             if ("hasDuplicates" in parsed) {
               result = parsed;
@@ -159,25 +205,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fallback: if LLM didn't produce valid JSON but search found answered threads,
-    // build a result from the search hits
     if (!result && searchHits.size > 0) {
       const answeredHits = Array.from(searchHits.values()).filter(
         (h) => h.isAnswered
       );
       if (answeredHits.length > 0) {
-        const matches: DuplicateMatch[] = answeredHits.slice(0, 5).map((h) => {
-          const full = getThreadFromCache(courseId, h.threadId);
-          const answerText = full?.answers?.[0]?.text ?? "";
-          return {
-            threadId: h.threadId,
-            threadNumber: h.threadNumber,
-            title: h.title,
-            relevance: "related" as const,
-            answerSnippet: answerText.slice(0, 200),
-            explanation: "This thread may be related to your question and has an existing answer.",
-          };
-        });
+        const matches: DuplicateMatch[] = answeredHits
+          .slice(0, 5)
+          .map((h) => {
+            const full = threadMap.get(h.threadId);
+            const answerText = full?.answers?.[0]?.text ?? "";
+            return {
+              threadId: h.threadId,
+              threadNumber: h.threadNumber,
+              title: h.title,
+              relevance: "related" as const,
+              answerSnippet: answerText.slice(0, 200),
+              explanation:
+                "This thread may be related to your question and has an existing answer.",
+            };
+          });
         result = { hasDuplicates: true, matches };
       }
     }

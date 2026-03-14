@@ -194,6 +194,7 @@ export function CourseDetailView({
         onClose={() => setComposerOpen(false)}
         course={digest.course}
         token={token}
+        threads={digest.threads}
         onPostSuccess={onPostSuccess}
       />
 

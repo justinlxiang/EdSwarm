@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { EdCourse, DuplicateMatch } from "@/lib/types";
+import type { EdCourse, EdThread, DuplicateMatch } from "@/lib/types";
 import { DEMO_TOKEN } from "@/lib/mock-data";
 import { addDemoThread } from "@/lib/demo-storage";
 import { useToken } from "@/lib/context";
@@ -30,13 +30,14 @@ interface Props {
   onClose: () => void;
   course: EdCourse;
   token: string;
+  threads: EdThread[];
   /** Called after a post is successfully created (e.g. to refresh the digest). */
   onPostSuccess?: () => void;
 }
 
 type PostType = "question" | "post";
 
-export function NewPostComposer({ open, onClose, course, token, onPostSuccess }: Props) {
+export function NewPostComposer({ open, onClose, course, token, threads, onPostSuccess }: Props) {
   const { user, isDemo } = useToken();
   const [postType, setPostType] = useState<PostType>("question");
   const [title, setTitle] = useState("");
@@ -114,6 +115,18 @@ export function NewPostComposer({ open, onClose, course, token, onPostSuccess }:
         courseId: course.id,
         questionTitle: currentTitle || aiPrompt,
         questionContent: currentBody || aiPrompt,
+        threads: threads.map((t) => ({
+          id: t.id,
+          number: t.number,
+          title: t.title,
+          content: t.content?.slice(0, 500) ?? "",
+          category: t.category,
+          is_answered: t.is_answered,
+          answers: (t.answers ?? []).slice(0, 2).map((a) => ({
+            text: (a.content || "").slice(0, 300),
+            is_endorsed: a.is_endorsed,
+          })),
+        })),
       }),
     }).catch(() => null);
 
@@ -244,6 +257,18 @@ export function NewPostComposer({ open, onClose, course, token, onPostSuccess }:
           courseId: course.id,
           questionTitle: title,
           questionContent,
+          threads: threads.map((t) => ({
+            id: t.id,
+            number: t.number,
+            title: t.title,
+            content: t.content?.slice(0, 500) ?? "",
+            category: t.category,
+            is_answered: t.is_answered,
+            answers: (t.answers ?? []).slice(0, 2).map((a) => ({
+              text: (a.content || "").slice(0, 300),
+              is_endorsed: a.is_endorsed,
+            })),
+          })),
         }),
       });
 
