@@ -45,3 +45,6 @@ data/threads/
 
 # cursor
 .cursor/
+
+# notes
+/notes/

@@ -345,6 +345,12 @@ const MATH201_THREADS: EdThread[] = [
 
   makeThread(91006, MA, 6, "question", "PS1 due date extension?", "I heard there might be an extension for PS1 since the textbook shipment was delayed. Can anyone confirm?", "Problem Sets", 0.4, {
     vote_count: 4,
+    is_answered: true,
+    is_staff_answered: true,
+    reply_count: 1,
+    answers: [
+      makeComment(81005, 91006, MA, DEMO_USER_ID, "answer", "Yes — PS1 has been extended by 3 days due to the textbook shipment delay. The new deadline is Friday, March 20 at 11:59pm. No late days will be deducted for this extension. If you still need the textbook, copies are available on 2-hour reserve at the library.", 0.2, { is_endorsed: true }),
+    ],
   }),
 ];
 
