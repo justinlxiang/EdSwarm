@@ -1,8 +1,12 @@
 import fs from "fs";
 import path from "path";
-import type { CachedThread, ThreadCacheFile } from "./types";
+import type { CachedThread, ThreadCacheFile, EdThread } from "./types";
+import { SEED_THREADS } from "./mock-data";
 
-const CACHE_DIR = path.join(process.cwd(), "data", "threads");
+const IS_VERCEL = !!process.env.VERCEL;
+const CACHE_DIR = IS_VERCEL
+  ? path.join("/tmp", "thread-cache")
+  : path.join(process.cwd(), "data", "threads");
 
 function ensureCacheDir() {
   if (!fs.existsSync(CACHE_DIR)) {
@@ -21,27 +25,77 @@ export function stripEdXml(xml: string): string {
     .trim();
 }
 
+const DEMO_COURSE_IDS = new Set([99999, 99998, 99997, 99996, 99995]);
+
+function seedThreadToCached(t: EdThread): CachedThread {
+  const answers = (t.answers ?? []).map((a) => ({
+    userId: a.user_id,
+    text: stripEdXml(a.document || a.content).slice(0, 500),
+    isEndorsed: a.is_endorsed,
+  }));
+  return {
+    id: t.id,
+    number: t.number,
+    title: t.title,
+    contentText: stripEdXml(t.document || t.content).slice(0, 500),
+    category: t.category,
+    type: t.type,
+    isAnswered: t.is_answered,
+    createdAt: t.created_at,
+    answers,
+  };
+}
+
+function buildDemoCacheForCourse(courseId: number): ThreadCacheFile | null {
+  if (!DEMO_COURSE_IDS.has(courseId)) return null;
+
+  const threads = SEED_THREADS
+    .filter((t) => t.course_id === courseId)
+    .map(seedThreadToCached);
+
+  return {
+    courseId,
+    syncedAt: new Date().toISOString(),
+    threadCount: threads.length,
+    threads,
+  };
+}
+
 export function readCache(courseId: number): ThreadCacheFile | null {
   const filePath = getCacheFilePath(courseId);
-  if (!fs.existsSync(filePath)) return null;
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as ThreadCacheFile;
-  } catch {
-    return null;
+  if (fs.existsSync(filePath)) {
+    try {
+      const raw = fs.readFileSync(filePath, "utf-8");
+      return JSON.parse(raw) as ThreadCacheFile;
+    } catch {
+      // fall through to demo fallback
+    }
   }
+
+  return buildDemoCacheForCourse(courseId);
 }
 
 export function writeCache(courseId: number, data: ThreadCacheFile): void {
-  ensureCacheDir();
-  const filePath = getCacheFilePath(courseId);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  try {
+    ensureCacheDir();
+    const filePath = getCacheFilePath(courseId);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // On Vercel or read-only filesystems, swallow the error.
+    // readCache will fall back to in-memory demo data.
+  }
 }
 
 export function isCacheFresh(courseId: number, maxAgeMs = 30 * 60 * 1000): boolean {
-  const cache = readCache(courseId);
-  if (!cache) return false;
-  return Date.now() - new Date(cache.syncedAt).getTime() < maxAgeMs;
+  const filePath = getCacheFilePath(courseId);
+  if (!fs.existsSync(filePath)) return false;
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const cache = JSON.parse(raw) as ThreadCacheFile;
+    return Date.now() - new Date(cache.syncedAt).getTime() < maxAgeMs;
+  } catch {
+    return false;
+  }
 }
 
 export function searchCache(
