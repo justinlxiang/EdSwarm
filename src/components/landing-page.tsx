@@ -176,7 +176,7 @@ export function LandingPage({ onEnterDashboard, userName }: LandingPageProps) {
       {/* Hero */}
       <section
         ref={heroRef}
-        className="relative min-h-[85vh] flex items-center justify-center overflow-hidden"
+        className="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-8 pb-16"
       >
         {/* Animated gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/30" />
