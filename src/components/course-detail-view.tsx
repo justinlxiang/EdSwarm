@@ -52,14 +52,24 @@ export function CourseDetailView({
     };
   }
 
+  const scrollAttemptRef = useRef(0);
   useEffect(() => {
     if (!expandThreadId) return;
-    const el = threadRefsMap.current.get(expandThreadId);
-    if (el) {
-      setTimeout(() => {
+    scrollAttemptRef.current++;
+    const attempt = scrollAttemptRef.current;
+
+    function tryScroll(retries: number) {
+      if (attempt !== scrollAttemptRef.current) return;
+      const el = threadRefsMap.current.get(expandThreadId!);
+      if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 100);
+      } else if (retries > 0) {
+        setTimeout(() => tryScroll(retries - 1), 200);
+      }
     }
+
+    // Delay longer when navigating from home digest so threads have time to mount
+    setTimeout(() => tryScroll(8), 100);
   }, [expandThreadId]);
 
   const questions = digest.threads.filter((t) => t.type === "question").length;

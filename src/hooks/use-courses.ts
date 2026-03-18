@@ -38,7 +38,10 @@ export function useCourseDigests() {
               (t) => t.course_id === cr.course.id
             );
             const filtered = filterThreadsByTime(threads, range);
-            return { course: cr.course, threads: filtered };
+            // Demo: always include threads so summaries and thread links work
+            // (mock timestamps can be stale; fallback to all if filter returns empty)
+            const useThreads = filtered.length > 0 ? filtered : threads;
+            return { course: cr.course, threads: useThreads };
           });
           all.sort((a, b) => b.threads.length - a.threads.length);
           setDigests(all);

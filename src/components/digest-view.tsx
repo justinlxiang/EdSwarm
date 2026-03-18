@@ -164,8 +164,26 @@ export function DigestView() {
   }
 
   function handleSelectCourse(courseId: number, threadId?: number) {
-    setSelectedCourseId(courseId);
-    setExpandThreadId(threadId ?? null);
+    // Resolve threadId: AI may output display number (1,2,3) instead of actual id (90001, etc.)
+    let resolvedThreadId = threadId;
+    if (threadId != null) {
+      const digest = digests.find((d) => d.course.id === courseId);
+      if (digest?.threads.length) {
+        const byId = digest.threads.find((t) => t.id === threadId);
+        if (!byId) {
+          const byIndex = digest.threads[threadId - 1];
+          if (byIndex) resolvedThreadId = byIndex.id;
+        }
+      }
+    }
+
+    if (resolvedThreadId != null && resolvedThreadId === expandThreadId && courseId === selectedCourseId) {
+      setExpandThreadId(null);
+      requestAnimationFrame(() => setExpandThreadId(resolvedThreadId));
+    } else {
+      setSelectedCourseId(courseId);
+      setExpandThreadId(resolvedThreadId ?? null);
+    }
     setSidebarOpen(false);
     syncCourseThreads(courseId);
   }

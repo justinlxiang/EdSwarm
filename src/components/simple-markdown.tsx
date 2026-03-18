@@ -14,7 +14,7 @@ function parseInline(
   // First, handle thread links - they take precedence
   const re = new RegExp(THREAD_LINK_RE.source, "g");
   const threadMatch = re.exec(remaining);
-  if (threadMatch && options?.onThreadLink) {
+  if (threadMatch) {
     const allMatches: RegExpExecArray[] = [threadMatch];
     let m: RegExpExecArray | null;
     while ((m = re.exec(remaining)) !== null) allMatches.push(m);
@@ -28,27 +28,29 @@ function parseInline(
       const [, linkText, , courseIdStr, threadIdStr] = match;
       const courseId = parseInt(courseIdStr, 10);
       const threadId = parseInt(threadIdStr, 10);
-      nodes.push(
-        <span
-          key={key()}
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            options.onThreadLink?.(courseId, threadId);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+      if (options?.onThreadLink) {
+        const handler = options.onThreadLink;
+        nodes.push(
+          <button
+            key={key()}
+            type="button"
+            onClick={(e) => {
               e.preventDefault();
-              options.onThreadLink?.(courseId, threadId);
-            }
-          }}
-          className="text-primary hover:underline font-medium inline cursor-pointer"
-        >
-          {linkText}
-        </span>
-      );
+              e.stopPropagation();
+              handler(courseId, threadId);
+            }}
+            className="text-primary hover:underline font-medium cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit align-baseline"
+          >
+            {linkText}
+          </button>
+        );
+      } else {
+        nodes.push(
+          <span key={key()} className="font-medium text-primary/70">
+            {linkText}
+          </span>
+        );
+      }
       lastIndex = match.index + match[0].length;
     }
     if (lastIndex < remaining.length) {

@@ -189,14 +189,17 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
               const summary = summaries[digest.course.id] ?? digest.summary;
 
               return (
-                <button
+                <div
                   key={digest.course.id}
-                  onClick={() => onSelectCourse(digest.course.id)}
                   className="group text-left bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden hover:shadow-md hover:border-border transition-all flex"
                 >
                   <div className={`w-1.5 shrink-0 ${colors.stripe}`} />
                   <div className="flex-1 min-w-0 p-4">
-                    <div className="flex items-center gap-3 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => onSelectCourse(digest.course.id)}
+                      className="w-full text-left flex items-center gap-3 mb-3 cursor-pointer"
+                    >
                       <div
                         className={`w-9 h-9 rounded-lg ${colors.bg} flex items-center justify-center shrink-0`}
                       >
@@ -211,7 +214,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                         </p>
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-                    </div>
+                    </button>
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                       <span className="flex items-center gap-1">
@@ -247,7 +250,6 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                       {!isLoading && summary && (
                         <div
                           className={`text-xs leading-relaxed text-foreground/70 ${colors.accent} rounded-lg p-2.5 border ${colors.accentBorder}`}
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center gap-1.5 mb-1">
                             <Sparkles
@@ -275,7 +277,7 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
                       )}
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>}
