@@ -47,7 +47,9 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
         continue;
 
       fetchedRef.current.add(digest.course.id);
-      setLoadingIds((prev) => new Set(prev).add(digest.course.id));
+      queueMicrotask(() =>
+        setLoadingIds((prev) => new Set(prev).add(digest.course.id))
+      );
 
       const threadData = digest.threads
         .slice(0, 20)
@@ -127,7 +129,9 @@ export function HomeOverview({ digests, onSelectCourse, range, courseColorMap, o
   useEffect(() => {
     if (termGroups.length > 1 && !collapsedInitRef.current) {
       collapsedInitRef.current = true;
-      setCollapsedTerms(new Set(termGroups.slice(1).map(([t]) => t)));
+      queueMicrotask(() =>
+        setCollapsedTerms(new Set(termGroups.slice(1).map(([t]) => t)))
+      );
     }
   }, [termGroups]);
 

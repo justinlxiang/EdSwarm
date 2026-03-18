@@ -33,6 +33,7 @@ interface Props {
   onAskAbout: (courseCode: string, courseId: number) => void;
   onGenerateSummary: (digest: CourseDigestType) => Promise<string>;
   onPostSuccess?: () => void;
+  onThreadLinkClick?: (courseId: number, threadId: number) => void;
 }
 
 export function CourseDigestCard({
@@ -42,6 +43,7 @@ export function CourseDigestCard({
   onAskAbout,
   onGenerateSummary,
   onPostSuccess,
+  onThreadLinkClick,
 }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [summary, setSummary] = useState(digest.summary || "");
@@ -147,6 +149,7 @@ export function CourseDigestCard({
               <SimpleMarkdown
                 text={summary}
                 className="text-sm text-foreground/80 leading-relaxed space-y-1.5"
+                onThreadLinkClick={onThreadLinkClick}
               />
             </div>
           )}
