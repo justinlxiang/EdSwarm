@@ -1,4 +1,6 @@
 import React from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 
 const THREAD_LINK_RE = /\[([^\]]+)\]\((thread:(\d+):(\d+))\)/g;
 
@@ -9,7 +11,7 @@ function parseInline(
   const nodes: React.ReactNode[] = [];
   let remaining = text;
   const keyRef = options?.keyRef ?? { current: 0 };
-  let key = () => keyRef.current++;
+  const key = () => keyRef.current++;
 
   // First, handle thread links - they take precedence
   const re = new RegExp(THREAD_LINK_RE.source, "g");
@@ -60,6 +62,53 @@ function parseInline(
   }
 
   while (remaining.length > 0) {
+    // LaTeX: $$...$$ (block) and $...$ (inline) - check before bold/code/italic
+    const blockMatch = remaining.match(/\$\$([\s\S]*?)\$\$/);
+    const inlineMatch = remaining.match(/\$([^$\n]+?)\$/);
+    const blockIdx = blockMatch ? remaining.indexOf("$$") : -1;
+    const inlineIdx = inlineMatch ? remaining.indexOf("$") : -1;
+
+    if (blockIdx !== -1 && (inlineIdx === -1 || blockIdx <= inlineIdx)) {
+      const endIdx = remaining.indexOf("$$", blockIdx + 2) + 2;
+      if (blockIdx > 0) {
+        nodes.push(...parseInline(remaining.slice(0, blockIdx), { keyRef }));
+      }
+      nodes.push(
+        <span
+          key={key()}
+          className="block my-2 overflow-x-auto [&_.katex]:text-[1em]"
+          dangerouslySetInnerHTML={{
+            __html: katex.renderToString(blockMatch![1].trim(), {
+              throwOnError: false,
+              displayMode: true,
+            }),
+          }}
+        />
+      );
+      remaining = remaining.slice(endIdx);
+      continue;
+    }
+    if (inlineIdx !== -1) {
+      const endIdx = remaining.indexOf("$", inlineIdx + 1) + 1;
+      if (inlineIdx > 0) {
+        nodes.push(...parseInline(remaining.slice(0, inlineIdx), { keyRef }));
+      }
+      nodes.push(
+        <span
+          key={key()}
+          className="[&_.katex]:text-[0.95em]"
+          dangerouslySetInnerHTML={{
+            __html: katex.renderToString(inlineMatch![1].trim(), {
+              throwOnError: false,
+              displayMode: false,
+            }),
+          }}
+        />
+      );
+      remaining = remaining.slice(endIdx);
+      continue;
+    }
+
     const patterns: { idx: number; type: string; marker: string }[] = [];
 
     const boldIdx = remaining.indexOf("**");

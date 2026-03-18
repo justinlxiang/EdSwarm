@@ -21,6 +21,8 @@ import {
   Award,
   PenLine,
 } from "lucide-react";
+import { TextWithMath } from "./text-with-math";
+import { SimpleMarkdown } from "./simple-markdown";
 
 function stripXml(xml: string): string {
   return xml
@@ -90,9 +92,11 @@ function CommentBubble({
             {timeAgo(comment.created_at)}
           </span>
         </div>
-        <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
-          {text}
-        </p>
+        <TextWithMath
+          text={text}
+          as="p"
+          className="text-foreground/80 leading-relaxed whitespace-pre-wrap"
+        />
         {comment.vote_count > 0 && (
           <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
             <ThumbsUp className="w-3 h-3" />
@@ -385,9 +389,11 @@ export function ThreadCard({ thread, token, expandThreadId, threadRef, displayNu
         <div className="border-t border-border/40">
           {/* Thread body */}
           <div className="px-4 pt-3 pb-2">
-            <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-              {preview}
-            </p>
+            <TextWithMath
+              text={preview}
+              as="p"
+              className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap"
+            />
           </div>
 
           {/* Comments section */}
@@ -519,9 +525,10 @@ export function ThreadCard({ thread, token, expandThreadId, threadRef, displayNu
                       {aiMode === "draft" ? "Draft Reply" : "AI Answer"}
                     </span>
                   </div>
-                  <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                    {aiResponse}
-                  </p>
+                  <SimpleMarkdown
+                    text={aiResponse}
+                    className="text-sm text-foreground/80 leading-relaxed space-y-1"
+                  />
                 </div>
 
                 {aiMode === "draft" && (
